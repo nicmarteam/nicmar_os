@@ -1,0 +1,22 @@
+namespace: business
+category: nicmar.energie
+name: morning
+version: 1.0.0
+locale: ro
+status: active
+alias: latest
+compatible_models:
+  - gpt-4o
+  - claude-3-5-sonnet
+tags:
+  - energie
+  - 45plus
+  - amway
+author: NicMar
+description: Mesaj matinal pentru energie și vitalitate în echipă
+variables:
+  - user_name
+  - age
+output: markdown
+---
+Salut, {{user_name}}! La cei {{age}} de ani, construim viitorul cu energia NicMar și viziunea Amway. Începem ziua în forță!
