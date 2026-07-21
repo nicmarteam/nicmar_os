@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, Type
+from pydantic import BaseModel
 from anthropic import Anthropic
 from src.llm.base_client import AbstractLLMClient, LLMResponse, LLMStreamChunk
 from src.llm.config import LLMConfig
 from src.llm.tools.formatters import ClaudeFormatter
 from src.llm.tools.mappers import ClaudeMapper
 from src.llm.tools.models import ToolResult
+from src.llm.structured.formatters import StructuredFormatter
 
 logger = logging.getLogger(__name__)
 
 
 class ClaudeClient(AbstractLLMClient):
-    """Client concret pentru integrarea cu API-ul Anthropic Claude, cu suport pentru tool calling."""
-
     def __init__(self, api_key: Optional[str] = None):
         key = api_key or LLMConfig.get_api_key("claude")
         self.client = Anthropic(api_key=key)
@@ -26,6 +26,7 @@ class ClaudeClient(AbstractLLMClient):
         tools: Optional[List[Any]] = None,
         tool_choice: Any = "auto",
         tool_results: Optional[List[ToolResult]] = None,
+        response_schema: Optional[Type[BaseModel]] = None,
         **kwargs: Any
     ) -> LLMResponse:
         target_model = model or LLMConfig.DEFAULT_CLAUDE_MODEL
@@ -43,6 +44,9 @@ class ClaudeClient(AbstractLLMClient):
             "max_tokens": 1024,
             "messages": messages,
         }
+
+        if response_schema:
+            payload["system"] = StructuredFormatter.format_claude_system_instruction(response_schema)
 
         formatted_tools = ClaudeFormatter.format_tools(tools)
         if formatted_tools:
@@ -84,14 +88,6 @@ class ClaudeClient(AbstractLLMClient):
             "max_tokens": 1024,
             "messages": [{"role": "user", "content": prompt}],
         }
-
-        formatted_tools = ClaudeFormatter.format_tools(tools)
-        if formatted_tools:
-            payload["tools"] = formatted_tools
-            formatted_choice = ClaudeFormatter.format_tool_choice(tool_choice)
-            if formatted_choice:
-                payload["tool_choice"] = formatted_choice
-
         with self.client.messages.stream(**payload, **kwargs) as stream:
             for text in stream.text_stream:
                 if text:

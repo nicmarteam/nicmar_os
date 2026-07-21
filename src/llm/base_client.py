@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, Type
+from pydantic import BaseModel
 from src.llm.tools.models import ToolCall, ToolResult
 
 
@@ -35,6 +36,7 @@ class AbstractLLMClient(ABC):
         tools: Optional[List[Any]] = None,
         tool_choice: Any = "auto",
         tool_results: Optional[List[ToolResult]] = None,
+        response_schema: Optional[Type[BaseModel]] = None,
         **kwargs: Any
     ) -> LLMResponse:
         pass
