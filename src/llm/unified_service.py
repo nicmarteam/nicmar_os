@@ -1,54 +1,48 @@
 from __future__ import annotations
 
-from typing import Iterator, Any
+from typing import Any, Iterable, Optional
 from src.llm.provider_factory import ProviderFactory
-from src.llm.streaming.models import LLMStreamChunk
+from src.llm.base_client import LLMResponse, LLMStreamChunk
 
 
 class UnifiedLLMService:
-    """Serviciu de orchestrare unificat care expune o singură interfață către restul aplicației."""
+    """Serviciu de orchestrare unificat pentru interacțiunea cu orice model LLM."""
 
-    def __init__(self, default_provider: str = "openai", default_model: str | None = None):
-        self.default_provider = default_provider
-        self.default_model = default_model
+    def __init__(self, default_provider: Optional[str] = None):
+        self._default_provider = default_provider
 
     def generate(
         self,
         prompt: str,
-        *,
-        provider: str | None = None,
-        model: str | None = None,
-        max_tokens: int = 1024,
-    ) -> str:
-        """Generează un răspuns text folosind providerul specificat sau cel implicit."""
-        target_provider = provider or self.default_provider
-        client = ProviderFactory.get_client(target_provider)
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        timeout: Optional[float] = None,
+        **kwargs: Any
+    ) -> LLMResponse:
+        """Generează un răspuns complet delegând către providerul obținut din fabrică."""
+        chosen_provider = provider or self._default_provider or ProviderFactory._global_config.default_provider
         
-        # Dacă clientul suportă generate() cu model specificat
-        kwargs: dict[str, Any] = {"max_tokens": max_tokens}
-        if model:
-            kwargs["model"] = model
-        elif self.default_model:
-            kwargs["model"] = self.default_model
-
-        return client.generate(prompt, **kwargs)
+        # Instantiem clientul prin factory
+        client = ProviderFactory.get_client(provider_name=chosen_provider, api_key=api_key, timeout=timeout)
+        
+        # Delegăm apelul către clientul concret
+        return client.generate(prompt=prompt, model=model, **kwargs)
 
     def stream(
         self,
         prompt: str,
-        *,
-        provider: str | None = None,
-        model: str | None = None,
-        max_tokens: int = 1024,
-    ) -> Iterator[LLMStreamChunk]:
-        """Pornește un flux de streaming folosind providerul specificat sau cel implicit."""
-        target_provider = provider or self.default_provider
-        client = ProviderFactory.get_client(target_provider)
-
-        kwargs: dict[str, Any] = {"max_tokens": max_tokens}
-        if model:
-            kwargs["model"] = model
-        elif self.default_model:
-            kwargs["model"] = self.default_model
-
-        return client.stream(prompt, **kwargs)
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        timeout: Optional[float] = None,
+        **kwargs: Any
+    ) -> Iterable[LLMStreamChunk]:
+        """Returnează un flux de bucăți (stream) delegând direct iteratorul de la provider."""
+        chosen_provider = provider or self._default_provider or ProviderFactory._global_config.default_provider
+        
+        # Instantiem clientul prin fabrică
+        client = ProviderFactory.get_client(provider_name=chosen_provider, api_key=api_key, timeout=timeout)
+        
+        # Delegăm fluxul direct, fără transformări sau concatenări
+        return client.stream(prompt=prompt, model=model, **kwargs)
