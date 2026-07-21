@@ -1,49 +1,96 @@
 from __future__ import annotations
 
-from typing import Iterator, Any
-import openai
+import logging
+from typing import Any, Iterable, List, Optional
+from openai import OpenAI
+from src.llm.base_client import AbstractLLMClient, LLMResponse, LLMStreamChunk
+from src.llm.config import LLMConfig
+from src.llm.tools.formatters import OpenAIFormatter
+from src.llm.tools.mappers import OpenAIMapper
+from src.llm.tools.models import ToolResult
 
-from src.llm.streaming.openai_mapper import OpenAIStreamMapper
-from src.llm.streaming.models import LLMStreamChunk
+logger = logging.getLogger(__name__)
 
 
-class OpenAIClient:
-    """Client pentru interacțiunea cu modelele OpenAI (generate și stream)."""
+class OpenAIClient(AbstractLLMClient):
+    """Client concret pentru integrarea cu API-ul OpenAI, cu suport pentru tool calling."""
 
-    def __init__(self, api_key: str | None = None, default_model: str = "gpt-4o"):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.client = openai.OpenAI(api_key=self.api_key)
-        self.default_model = default_model
+    def __init__(self, api_key: Optional[str] = None):
+        key = api_key or LLMConfig.get_api_key("openai")
+        self.client = OpenAI(api_key=key)
+
+    def generate(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        tools: Optional[List[Any]] = None,
+        tool_choice: Any = "auto",
+        tool_results: Optional[List[ToolResult]] = None,
+        **kwargs: Any
+    ) -> LLMResponse:
+        target_model = model or LLMConfig.DEFAULT_OPENAI_MODEL
+
+        messages: List[Any] = []
+        
+        # Dacă avem rezultate anterioare de la tool-uri, construim istoricul de mesaje corespunzător
+        if tool_results:
+            messages.append({"role": "user", "content": prompt})
+            # Aici simulăm/adăugăm mesajul asistentului cu tool_calls anterioare dacă este cazul, 
+            # sau adăugăm direct mesajele de tip tool.
+            for res in tool_results:
+                messages.append(OpenAIMapper.tool_result_to_openai_message(res))
+        else:
+            messages.append({"role": "user", "content": prompt})
+
+        payload: dict = {
+            "model": target_model,
+            "messages": messages,
+        }
+
+        formatted_tools = OpenAIFormatter.format_tools(tools)
+        if formatted_tools:
+            payload["tools"] = formatted_tools
+            payload["tool_choice"] = OpenAIFormatter.format_tool_choice(tool_choice)
+
+        response = self.client.chat.completions.create(**payload, **kwargs)
+        choice = response.choices[0]
+        message = choice.message
+
+        tool_calls = []
+        if message.tool_calls:
+            for tc in message.tool_calls:
+                tool_calls.append(OpenAIMapper.tool_call_from_openai(tc))
+
+        return LLMResponse(
+            content=message.content,
+            model=target_model,
+            provider="openai",
+            tool_calls=tool_calls,
+            raw_response=response
+        )
 
     def stream(
         self,
         prompt: str,
-        *,
-        model: str | None = None,
-        max_tokens: int = 1024,
-    ) -> Iterator[LLMStreamChunk]:
-        """Pornește un flux de streaming OpenAI și mapează evenimentele folosind OpenAIStreamMapper."""
-        target_model = model or self.default_model
+        model: Optional[str] = None,
+        tools: Optional[List[Any]] = None,
+        tool_choice: Any = "auto",
+        **kwargs: Any
+    ) -> Iterable[LLMStreamChunk]:
+        target_model = model or LLMConfig.DEFAULT_OPENAI_MODEL
+        payload: dict = {
+            "model": target_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": True
+        }
 
-        # 1. Pornim stream-ul folosind SDK-ul OpenAI
-        stream_response = self.client.chat.completions.create(
-            model=target_model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            stream=True,
-        )
+        formatted_tools = OpenAIFormatter.format_tools(tools)
+        if formatted_tools:
+            payload["tools"] = formatted_tools
+            payload["tool_choice"] = OpenAIFormatter.format_tool_choice(tool_choice)
 
-        sequence = 0
-        # 2. Iterăm evenimentele brute primite de la SDK
-        for raw_event in stream_response:
-            sequence += 1
-            
-            # 3. Delegăm transformarea către OpenAIStreamMapper
-            chunk = OpenAIStreamMapper.map(
-                raw_event,
-                sequence=sequence,
-                model=target_model,
-            )
-            
-            # 4. Facem yield pentru chunk-ul normalizat
-            yield chunk
+        stream_response = self.client.chat.completions.create(**payload, **kwargs)
+        for chunk in stream_response:
+            delta = chunk.choices[0].delta.content if chunk.choices and chunk.choices[0].delta else None
+            if delta:
+                yield LLMStreamChunk(delta=delta, model=target_model, provider="openai", raw_chunk=chunk)
