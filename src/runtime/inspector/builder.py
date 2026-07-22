@@ -35,13 +35,14 @@ class InspectorBuilder:
             estimated_cost=m.estimated_cost
         )
 
+        # Timeline events complet generate din stările runtime-ului
         events = [
             TimelineEventInfo(timestamp=m.started_at, event_type="REQUEST_STARTED", details={"trace_id": execution.trace_id}),
         ]
         if m.first_token_at > 0:
-            events.append(TimelineEventInfo(timestamp=m.first_token_at, event_type="FIRST_TOKEN_RECEIVED", details={"ttft_ms": m.ttft_ms}))
+            events.append(TimelineEventInfo(timestamp=m.first_token_at, event_type="FIRST_TOKEN_RECEIVED", details={"ttft_ms": round(m.ttft_ms, 2)}))
         if m.finished_at > 0:
-            events.append(TimelineEventInfo(timestamp=m.finished_at, event_type="EXECUTION_FINISHED", details={"status": execution.status.value}))
+            events.append(TimelineEventInfo(timestamp=m.finished_at, event_type="EXECUTION_FINISHED", details={"status": execution.status.value, "total_ms": round(m.elapsed_ms, 2)}))
 
         return InspectorSnapshot(
             request=req_info,
