@@ -4,40 +4,22 @@ from src.runtime.timeline.models import TimelineEvent, ExecutionTimeline
 class TimelineBuilder:
     @staticmethod
     def build_from_execution(execution: RuntimeExecution) -> ExecutionTimeline:
-        started_at = execution.metrics.started_at
-        finished_at = execution.metrics.finished_at
-        total_duration = execution.metrics.elapsed_ms
+        m = execution.metrics
+        started_at = getattr(m, "started_at", 0.0)
+        finished_at = getattr(m, "finished_at", 0.0)
+        total_duration = getattr(m, "elapsed_ms", 0.0)
 
-        events: List[TimelineEvent] = []
-        
-        # Transformăm evenimentele brute din execution.events în TimelineEvent-uri structurate
-        for i, raw_event in enumerate(execution.events):
-            ev_type = raw_event.get("event_type", "UNKNOWN")
-            timestamp = raw_event.get("timestamp", started_at)
-            details = raw_event.get("details", {})
-            
-            # Mapare prietenoasă pentru titluri
-            title_map = {
-                "REQUEST_CREATED": "Request Created",
-                "PROVIDER_CALLED": "Provider Request",
-                "FIRST_TOKEN_RECEIVED": "First Token Received",
-                "EXECUTION_FINISHED": "Execution Completed",
-                "EXECUTION_ERROR": "Execution Error"
-            }
-            title = title_map.get(ev_type, ev_type.replace("_", " ").title())
-            
-            duration = details.get("ttft_ms", details.get("total_ms", 0.0))
-            status = "error" if ev_type == "EXECUTION_ERROR" else "completed"
-
+        events = []
+        for raw_event in execution.events:
             events.append(TimelineEvent(
-                id=f"evt_{i+1:03d}",
-                timestamp=timestamp,
-                event_type=ev_type,
-                title=title,
-                description=str(details),
-                duration_ms=duration,
-                status=status,
-                metadata=details
+                id=raw_event.get("id", "evt_000"),
+                timestamp=raw_event.get("timestamp", 0.0),
+                event_type=raw_event.get("event_type", "UNKNOWN"),
+                title=raw_event.get("title", "Event"),
+                description=raw_event.get("description", ""),
+                duration_ms=raw_event.get("duration_ms", 0.0),
+                status=raw_event.get("status", "completed"),
+                metadata=raw_event.get("metadata", {})
             ))
 
         return ExecutionTimeline(
