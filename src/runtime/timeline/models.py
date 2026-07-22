@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from src.runtime.timeline.performance import PerformanceMetrics
 
 class TimelineEventType:
     REQUEST_CREATED = "request_created"
@@ -32,4 +33,5 @@ class ExecutionTimeline:
     started_at: float = 0.0
     finished_at: float = 0.0
     total_duration_ms: float = 0.0
+    performance: PerformanceMetrics = field(default_factory=PerformanceMetrics)
     events: List[TimelineEvent] = field(default_factory=list)

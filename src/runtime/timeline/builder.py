@@ -1,5 +1,6 @@
 from src.runtime.stream.models import RuntimeExecution
 from src.runtime.timeline.models import TimelineEvent, ExecutionTimeline
+from src.runtime.timeline.performance import PerformanceMetrics
 
 class TimelineBuilder:
     @staticmethod
@@ -8,6 +9,18 @@ class TimelineBuilder:
         started_at = getattr(m, "started_at", 0.0)
         finished_at = getattr(m, "finished_at", 0.0)
         total_duration = getattr(m, "elapsed_ms", 0.0)
+
+        # Extragem sau construim metricile de performanță gata calculate
+        perf = PerformanceMetrics(
+            ttft_ms=getattr(m, "ttft_ms", 0.0),
+            provider_latency_ms=getattr(m, "elapsed_ms", 0.0),
+            stream_duration_ms=getattr(m, "elapsed_ms", 0.0),
+            execution_duration_ms=total_duration,
+            tokens_input=getattr(m, "input_tokens", 0),
+            tokens_output=getattr(m, "output_tokens", 0),
+            tokens_per_second=getattr(m, "tokens_per_second", 0.0),
+            estimated_cost=getattr(m, "estimated_cost", 0.0)
+        )
 
         events = []
         for raw_event in execution.events:
@@ -27,5 +40,6 @@ class TimelineBuilder:
             started_at=started_at,
             finished_at=finished_at,
             total_duration_ms=total_duration,
+            performance=perf,
             events=events
         )
