@@ -61,6 +61,16 @@ class ExecutionContext:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
+class MemoryTrace:
+    enabled: bool = False
+    memories_loaded: List[str] = field(default_factory=list)
+    memory_ids: List[str] = field(default_factory=list)
+    selection_strategy: str = ""
+    selection_reason: str = ""
+    retrieval_time_ms: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class RuntimeExecution:
     trace_id: str
     provider: str
@@ -68,6 +78,7 @@ class RuntimeExecution:
     prompt: str
     temperature: float = 0.7
     context: Optional[ExecutionContext] = None
+    memory: Optional[MemoryTrace] = field(default_factory=MemoryTrace)
     status: RuntimeStatus = RuntimeStatus.IDLE
     metrics: StreamMetrics = field(default_factory=StreamMetrics)
     response_text: str = ""

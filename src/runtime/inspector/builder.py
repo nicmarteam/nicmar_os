@@ -9,6 +9,7 @@ class InspectorBuilder:
     @staticmethod
     def build_from_execution(execution: RuntimeExecution, prompt_text: str = "") -> InspectorSnapshot:
         ctx = execution.context
+        mem = execution.memory
         
         sys_prompt = ctx.system_prompt if ctx else ""
         res_prompt = ctx.resolved_prompt if ctx else (prompt_text or execution.prompt)
@@ -33,6 +34,15 @@ class InspectorBuilder:
             system_prompt=sys_prompt
         )
 
+        memory_info = MemoryLookupInfo(
+            enabled=mem.enabled if mem else False,
+            memories_loaded=mem.memories_loaded if mem else [],
+            memory_ids=mem.memory_ids if mem else [],
+            selection_strategy=mem.selection_strategy if mem else "",
+            selection_reason=mem.selection_reason if mem else "",
+            retrieval_time_ms=mem.retrieval_time_ms if mem else 0.0
+        )
+
         m = execution.metrics
         metrics_info = MetricsInfo(
             ttft_ms=m.ttft_ms,
@@ -53,7 +63,7 @@ class InspectorBuilder:
             provider_info=prov_info,
             prompt=prompt_info,
             context=ContextInfo(),
-            memory=MemoryLookupInfo(),
+            memory=memory_info,
             rag=RAGRetrievalInfo(),
             tools=[],
             events=events,

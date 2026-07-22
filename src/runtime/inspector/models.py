@@ -28,8 +28,12 @@ class ContextInfo:
 
 @dataclass
 class MemoryLookupInfo:
-    queries: List[str] = field(default_factory=list)
-    retrieved_memories: List[Dict[str, Any]] = field(default_factory=list)
+    enabled: bool = False
+    memories_loaded: List[str] = field(default_factory=list)
+    memory_ids: List[str] = field(default_factory=list)
+    selection_strategy: str = ""
+    selection_reason: str = ""
+    retrieval_time_ms: float = 0.0
 
 @dataclass
 class RAGRetrievalInfo:

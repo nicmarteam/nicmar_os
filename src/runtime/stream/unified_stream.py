@@ -4,7 +4,7 @@ import uuid
 
 from src.runtime.stream.models import (
     LLMStreamChunk, StreamChunkType, StreamMetrics, 
-    RuntimeExecution, RuntimeStatus, TokenUsage, ExecutionContext
+    RuntimeExecution, RuntimeStatus, TokenUsage, ExecutionContext, MemoryTrace
 )
 from src.runtime.stream.adapters import BaseStreamAdapter
 
@@ -23,6 +23,7 @@ class UnifiedStreamService:
         temperature: float = 0.7, 
         system_prompt: str = "",
         max_tokens: Optional[int] = None,
+        memory_trace: Optional[MemoryTrace] = None,
         **kwargs
     ) -> AsyncGenerator[Tuple[RuntimeStatus, Optional[LLMStreamChunk], RuntimeExecution], None]:
         if provider not in self._adapters:
@@ -32,17 +33,18 @@ class UnifiedStreamService:
         trace_id = str(uuid.uuid4())
         metrics = StreamMetrics(started_at=time.time())
         
-        # Construim ExecutionContext oficial
         exec_context = ExecutionContext(
             provider=provider,
             model=model,
             system_prompt=system_prompt,
             user_prompt=prompt,
-            resolved_prompt=prompt, # Momentan identic; ulterior va include system, memory, rag etc.
+            resolved_prompt=prompt,
             temperature=temperature,
             max_tokens=max_tokens,
             trace_id=trace_id
         )
+
+        active_memory = memory_trace if memory_trace is not None else MemoryTrace()
 
         execution = RuntimeExecution(
             trace_id=trace_id,
@@ -51,6 +53,7 @@ class UnifiedStreamService:
             prompt=prompt,
             temperature=temperature,
             context=exec_context,
+            memory=active_memory,
             status=RuntimeStatus.CONNECTING,
             metrics=metrics
         )
