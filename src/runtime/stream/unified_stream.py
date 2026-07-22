@@ -1,26 +1,33 @@
-import os
-from google import genai
+from typing import AsyncGenerator, Dict, Type
+import time
+import uuid
+
+from src.runtime.stream.models import LLMStreamChunk, StreamChunkType, StreamMetrics, StreamSession
+from src.runtime.stream.adapters import BaseStreamAdapter
 
 class UnifiedStreamService:
-    """
-    Gestionează streamingul în timp real pentru providerii suportati (Gemini, etc.).
-    """
     def __init__(self):
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        self._adapters: Dict[str, Type[BaseStreamAdapter]] = {}
 
-    def stream_generate(self, prompt: str, provider: str = "gemini"):
-        if provider == "gemini":
-            client = genai.Client(api_key=self.gemini_api_key)
-            # Folosim API-ul nativ de streaming al Google GenAI SDK
-            response = client.models.generate_content_stream(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
-        else:
-            # Fallback simulat pentru alți provideri până la integrarea completă
-            full_text = f"[Streaming Mock pentru {provider}] Răspuns în timp real pentru: {prompt}"
-            for word in full_text.split():
-                yield word + " "
+    def register_adapter(self, provider_name: str, adapter_cls: Type[BaseStreamAdapter]):
+        self._adapters[provider_name] = adapter_cls
+
+    async def stream(self, provider: str, model: str, prompt: str, **kwargs) -> AsyncGenerator[LLMStreamChunk, None]:
+        if provider not in self._adapters:
+            raise ValueError(f"Provider necunoscut pentru streaming: {provider}")
+        
+        adapter_instance = self._adapters[provider]()
+        request_id = str(uuid.uuid4())
+        metrics = StreamMetrics(started_at=time.time())
+        session = StreamSession(request_id=request_id, provider=provider, model=model, metrics=metrics)
+
+        async for chunk in adapter_instance.stream(prompt=prompt, model=model, **kwargs):
+            session.chunks.append(chunk)
+            if chunk.chunk_type == StreamChunkType.DELTA and metrics.first_token_at == 0.0:
+                metrics.first_token_at = time.time()
+                metrics.ttft_ms = (metrics.first_token_at - metrics.started_at) * 1000.0
+
+            yield chunk
+
+        metrics.finished_at = time.time()
+        metrics.elapsed_ms = (metrics.finished_at - metrics.started_at) * 1000.0
