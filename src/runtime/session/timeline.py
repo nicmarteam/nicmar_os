@@ -75,6 +75,8 @@ class ConversationTimelineRenderer:
         def fmt_time(ts: float) -> str:
             return datetime.fromtimestamp(ts).strftime("%H:%M:%S")
 
+        circled_numbers = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"]
+
         lines = [
             "═══════════════════════════════════════",
             "Conversation Timeline",
@@ -84,9 +86,10 @@ class ConversationTimelineRenderer:
             "────────────────────────────"
         ]
 
-        for ev in timeline.events:
+        for idx, ev in enumerate(timeline.events):
+            num_symbol = circled_numbers[idx] if idx < len(circled_numbers) else f"({idx+1})"
             lines.extend([
-                f"① {ev.execution_id}",
+                f"{num_symbol} {ev.execution_id}",
                 f"   Prompt:  {ev.title}",
                 f"   Model:   {ev.model}",
                 f"   Duration: {ev.duration_ms} ms",
