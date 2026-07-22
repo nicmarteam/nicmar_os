@@ -71,6 +71,26 @@ class MemoryTrace:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
+class RetrievedChunk:
+    chunk_id: str = ""
+    document_id: str = ""
+    source: str = ""
+    score: float = 0.0
+    content_preview: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class RAGTrace:
+    enabled: bool = False
+    query: str = ""
+    retrieval_strategy: str = ""
+    total_chunks: int = 0
+    retrieved_chunks: List[RetrievedChunk] = field(default_factory=list)
+    selected_chunk_ids: List[str] = field(default_factory=list)
+    retrieval_time_ms: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class RuntimeExecution:
     trace_id: str
     provider: str
@@ -79,6 +99,7 @@ class RuntimeExecution:
     temperature: float = 0.7
     context: Optional[ExecutionContext] = None
     memory: Optional[MemoryTrace] = field(default_factory=MemoryTrace)
+    rag: Optional[RAGTrace] = field(default_factory=RAGTrace)
     status: RuntimeStatus = RuntimeStatus.IDLE
     metrics: StreamMetrics = field(default_factory=StreamMetrics)
     response_text: str = ""

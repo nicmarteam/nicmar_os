@@ -36,9 +36,22 @@ class MemoryLookupInfo:
     retrieval_time_ms: float = 0.0
 
 @dataclass
+class RetrievedChunkInfo:
+    chunk_id: str = ""
+    document_id: str = ""
+    source: str = ""
+    score: float = 0.0
+    content_preview: str = ""
+
+@dataclass
 class RAGRetrievalInfo:
-    documents: List[str] = field(default_factory=list)
-    chunks: List[str] = field(default_factory=list)
+    enabled: bool = False
+    query: str = ""
+    retrieval_strategy: str = ""
+    total_chunks: int = 0
+    retrieved_chunks: List[RetrievedChunkInfo] = field(default_factory=list)
+    selected_chunk_ids: List[str] = field(default_factory=list)
+    retrieval_time_ms: float = 0.0
 
 @dataclass
 class MetricsInfo:
