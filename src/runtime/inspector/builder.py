@@ -7,11 +7,11 @@ from src.runtime.inspector.snapshot import InspectorSnapshot
 
 class InspectorBuilder:
     @staticmethod
-    def build_from_execution(execution: RuntimeExecution, prompt_text: str, temperature: float = 0.7) -> InspectorSnapshot:
+    def build_from_execution(execution: RuntimeExecution) -> InspectorSnapshot:
         req_info = RequestInfo(
             trace_id=execution.trace_id,
-            prompt=prompt_text,
-            temperature=temperature,
+            prompt=execution.prompt,
+            temperature=execution.temperature,
             timestamp=execution.metrics.started_at
         )
 
@@ -21,8 +21,8 @@ class InspectorBuilder:
         )
 
         prompt_info = PromptInfo(
-            raw_prompt=prompt_text,
-            rendered_prompt=prompt_text
+            raw_prompt=execution.prompt,
+            rendered_prompt=execution.prompt
         )
 
         m = execution.metrics
@@ -35,14 +35,10 @@ class InspectorBuilder:
             estimated_cost=m.estimated_cost
         )
 
-        # Timeline events complet generate din stările runtime-ului
         events = [
-            TimelineEventInfo(timestamp=m.started_at, event_type="REQUEST_STARTED", details={"trace_id": execution.trace_id}),
+            TimelineEventInfo(timestamp=ev["timestamp"], event_type=ev["event_type"], details=ev["details"])
+            for ev in execution.events
         ]
-        if m.first_token_at > 0:
-            events.append(TimelineEventInfo(timestamp=m.first_token_at, event_type="FIRST_TOKEN_RECEIVED", details={"ttft_ms": round(m.ttft_ms, 2)}))
-        if m.finished_at > 0:
-            events.append(TimelineEventInfo(timestamp=m.finished_at, event_type="EXECUTION_FINISHED", details={"status": execution.status.value, "total_ms": round(m.elapsed_ms, 2)}))
 
         return InspectorSnapshot(
             request=req_info,

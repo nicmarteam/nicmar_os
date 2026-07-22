@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 class StreamChunkType(str, Enum):
     START = "start"
@@ -52,8 +52,11 @@ class RuntimeExecution:
     trace_id: str
     provider: str
     model: str
-    status: RuntimeStatus
-    metrics: StreamMetrics
+    prompt: str
+    temperature: float = 0.7
+    status: RuntimeStatus = RuntimeStatus.IDLE
+    metrics: StreamMetrics = field(default_factory=StreamMetrics)
     response_text: str = ""
     error_message: Optional[str] = None
-    chunks: list[LLMStreamChunk] = field(default_factory=list)
+    chunks: List[LLMStreamChunk] = field(default_factory=list)
+    events: List[Dict[str, Any]] = field(default_factory=list)
