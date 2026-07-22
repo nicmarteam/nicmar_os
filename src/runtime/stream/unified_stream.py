@@ -4,7 +4,7 @@ import uuid
 
 from src.runtime.stream.models import (
     LLMStreamChunk, StreamChunkType, StreamMetrics, 
-    RuntimeExecution, RuntimeStatus, TokenUsage
+    RuntimeExecution, RuntimeStatus, TokenUsage, ExecutionContext
 )
 from src.runtime.stream.adapters import BaseStreamAdapter
 
@@ -15,7 +15,16 @@ class UnifiedStreamService:
     def register_adapter(self, provider_name: str, adapter_cls: Type[BaseStreamAdapter]):
         self._adapters[provider_name] = adapter_cls
 
-    async def execute_stream(self, provider: str, model: str, prompt: str, temperature: float = 0.7, **kwargs) -> AsyncGenerator[Tuple[RuntimeStatus, Optional[LLMStreamChunk], RuntimeExecution], None]:
+    async def execute_stream(
+        self, 
+        provider: str, 
+        model: str, 
+        prompt: str, 
+        temperature: float = 0.7, 
+        system_prompt: str = "",
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> AsyncGenerator[Tuple[RuntimeStatus, Optional[LLMStreamChunk], RuntimeExecution], None]:
         if provider not in self._adapters:
             raise ValueError(f"Provider necunoscut pentru streaming: {provider}")
         
@@ -23,12 +32,25 @@ class UnifiedStreamService:
         trace_id = str(uuid.uuid4())
         metrics = StreamMetrics(started_at=time.time())
         
+        # Construim ExecutionContext oficial
+        exec_context = ExecutionContext(
+            provider=provider,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=prompt,
+            resolved_prompt=prompt, # Momentan identic; ulterior va include system, memory, rag etc.
+            temperature=temperature,
+            max_tokens=max_tokens,
+            trace_id=trace_id
+        )
+
         execution = RuntimeExecution(
             trace_id=trace_id,
             provider=provider,
             model=model,
             prompt=prompt,
             temperature=temperature,
+            context=exec_context,
             status=RuntimeStatus.CONNECTING,
             metrics=metrics
         )
@@ -61,7 +83,6 @@ class UnifiedStreamService:
 
                 yield execution.status, chunk, execution
 
-            # Finalizare metrice
             metrics.finished_at = time.time()
             metrics.elapsed_ms = (metrics.finished_at - metrics.started_at) * 1000.0
             

@@ -48,12 +48,26 @@ class StreamMetrics:
     estimated_cost: float = 0.0
 
 @dataclass
+class ExecutionContext:
+    provider: str
+    model: str
+    system_prompt: str = ""
+    user_prompt: str = ""
+    resolved_prompt: str = ""
+    temperature: float = 0.7
+    max_tokens: Optional[int] = None
+    session_id: str = ""
+    trace_id: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class RuntimeExecution:
     trace_id: str
     provider: str
     model: str
     prompt: str
     temperature: float = 0.7
+    context: Optional[ExecutionContext] = None
     status: RuntimeStatus = RuntimeStatus.IDLE
     metrics: StreamMetrics = field(default_factory=StreamMetrics)
     response_text: str = ""

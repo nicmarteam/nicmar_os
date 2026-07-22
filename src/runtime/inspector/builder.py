@@ -7,12 +7,19 @@ from src.runtime.inspector.snapshot import InspectorSnapshot
 
 class InspectorBuilder:
     @staticmethod
-    def build_from_execution(execution: RuntimeExecution) -> InspectorSnapshot:
+    def build_from_execution(execution: RuntimeExecution, prompt_text: str = "") -> InspectorSnapshot:
+        ctx = execution.context
+        
+        sys_prompt = ctx.system_prompt if ctx else ""
+        res_prompt = ctx.resolved_prompt if ctx else (prompt_text or execution.prompt)
+
         req_info = RequestInfo(
             trace_id=execution.trace_id,
-            prompt=execution.prompt,
+            prompt=prompt_text or execution.prompt,
             temperature=execution.temperature,
-            timestamp=execution.metrics.started_at
+            timestamp=execution.metrics.started_at,
+            system_prompt=sys_prompt,
+            resolved_prompt=res_prompt
         )
 
         prov_info = ProviderInfo(
@@ -21,8 +28,9 @@ class InspectorBuilder:
         )
 
         prompt_info = PromptInfo(
-            raw_prompt=execution.prompt,
-            rendered_prompt=execution.prompt
+            raw_prompt=prompt_text or execution.prompt,
+            rendered_prompt=res_prompt,
+            system_prompt=sys_prompt
         )
 
         m = execution.metrics

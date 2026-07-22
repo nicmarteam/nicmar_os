@@ -5,25 +5,26 @@ from typing import Any, Dict, List, Optional
 class RequestInfo:
     trace_id: str
     prompt: str
-    temperature: float = 0.7
-    max_tokens: Optional[int] = None
-    timestamp: float = 0.0
+    temperature: float
+    timestamp: float
+    system_prompt: str = ""
+    resolved_prompt: str = ""
 
 @dataclass
 class ProviderInfo:
     provider: str
     model: str
-    api_endpoint: Optional[str] = None
 
 @dataclass
 class PromptInfo:
     raw_prompt: str
     rendered_prompt: str
-    system_instruction: Optional[str] = None
+    system_prompt: str = ""
 
 @dataclass
 class ContextInfo:
-    items: List[Dict[str, Any]] = field(default_factory=list)
+    active_context_keys: List[str] = field(default_factory=list)
+    variables: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class MemoryLookupInfo:
@@ -32,21 +33,8 @@ class MemoryLookupInfo:
 
 @dataclass
 class RAGRetrievalInfo:
-    query: str = ""
-    documents: List[Dict[str, Any]] = field(default_factory=list)
-
-@dataclass
-class ToolExecutionInfo:
-    tool_name: str
-    arguments: Dict[str, Any] = field(default_factory=dict)
-    result: Any = None
-    duration_ms: float = 0.0
-
-@dataclass
-class TimelineEventInfo:
-    timestamp: float
-    event_type: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    documents: List[str] = field(default_factory=list)
+    chunks: List[str] = field(default_factory=list)
 
 @dataclass
 class MetricsInfo:
@@ -56,3 +44,9 @@ class MetricsInfo:
     input_tokens: int = 0
     output_tokens: int = 0
     estimated_cost: float = 0.0
+
+@dataclass
+class TimelineEventInfo:
+    timestamp: float
+    event_type: str
+    details: Dict[str, Any] = field(default_factory=dict)
