@@ -10,6 +10,15 @@ class StreamChunkType(str, Enum):
     ERROR = "error"
     FINISH = "finish"
 
+class RuntimeStatus(str, Enum):
+    IDLE = "IDLE"
+    CONNECTING = "CONNECTING"
+    WAITING_FIRST_TOKEN = "WAITING_FIRST_TOKEN"
+    STREAMING = "STREAMING"
+    FINISHED = "FINISHED"
+    ERROR = "ERROR"
+    CANCELLED = "CANCELLED"
+
 @dataclass
 class TokenUsage:
     input_tokens: int = 0
@@ -39,9 +48,12 @@ class StreamMetrics:
     estimated_cost: float = 0.0
 
 @dataclass
-class StreamSession:
-    request_id: str
+class RuntimeExecution:
+    trace_id: str
     provider: str
     model: str
+    status: RuntimeStatus
     metrics: StreamMetrics
+    response_text: str = ""
+    error_message: Optional[str] = None
     chunks: list[LLMStreamChunk] = field(default_factory=list)
