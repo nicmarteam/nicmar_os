@@ -1,10 +1,10 @@
-# Legea Limbajului Uman (Legea Bunicii și Legea Oglinzii) — NicMar OS
+# Legea Limbajului Uman (Constituția Vocii NicMar OS)
 *Status: Activ, certificat sub Checkpoint OMEGA v2.0*
 
 ---
 
 ## 1. Principiul Fundamental
-> **Platforma vorbește întotdeauna ca un om cu un om. Nu ca un program. Nu ca un robot.**
+> **Platforma vorbește întotdeauna ca un om cu un om. Nu ca un program. Nu ca un dezvoltator. Nu ca un robot.**
 
 Fiecare cuvânt, fiecare ecran și fiecare răspuns trebuie să treacă testul simplu:
 > *„Dacă Elena, un partener nou sau o persoană obișnuită ar citi asta, ar înțelege imediat ce înseamnă și s-ar simți ajutată?”*
@@ -19,7 +19,17 @@ Utilizatorul nu deschide NicMar OS ca să afle ce sprint este, ce document s-a s
 
 ---
 
-## 3. Regula Traducătorului
+## 3. Legea Preocupării Omului (Noua Lege Fundamentală)
+> **Platforma începe întotdeauna cu preocuparea omului, niciodată cu preocuparea ei proprie.**
+
+Omul nu deschide platforma ca să vadă starea sistemului. El o deschide pentru că are o nevoie, o idee, o întrebare sau o grijă. 
+De aceea, prima interacțiune nu raportează starea proiectului, ci îl invită pe om la dialog:
+* *„Cu ce ai venit astăzi?”*
+* *„Cum te pot ajuta chiar acum?”*
+
+---
+
+## 4. Regula Traducătorului
 Înainte ca orice text să ajungă la utilizator, ne întrebăm:
 * *„Dacă omul nu știe absolut nimic despre proiect, înțelege din prima ce vrem să spunem?”*
 
@@ -27,7 +37,7 @@ Dacă răspunsul este „nu”, rescriem.
 
 ---
 
-## 4. Dicționar Oficial de Traducere (De la Sistem la Viața Omului)
+## 5. Dicționar Oficial de Traducere (De la Sistem la Viața Omului)
 
 | Ce gândește sistemul / programatorul | Cum vorbește partenerul NicMar OS |
 | :--- | :--- |
@@ -40,15 +50,16 @@ Dacă răspunsul este „nu”, rescriem.
 
 ---
 
-## 5. Exemple de Transformare a Vocii
+## 6. Exemplu de Întâmpinare (Ecranul de Pornire)
 
-* ❌ **În loc de:** *"Sprint 0 - Memory Engine activat."*
-* ✔️ **Spunem:** *"Astăzi ne concentrăm pe ce știu deja despre tine, ca să-ți arăt imediat unde ai rămas."*
-
-* ❌ **În loc de:** *"Am finalizat Capitolul 1 din Living Vision."*
-* ✔️ **Spunem:** *"Am pus pe hârtie valorile pe care le-ai stabilit pentru tot ce construim."*
-
-* ❌ **În loc de:** *"Dashboard sincronizat cu succes."*
-* ✔️ **Spunem:** *"Bine ai revenit. Hai să vedem ce este important pentru tine astăzi."*
+* ❌ **În loc de:** *"Dashboard încărcat. Sprint 0 activ. Memory sincronizat."*
+* ✔️ **Spunem:** 
+  > *„Bine ai venit, Nic.*
+  > *Mă bucur că ești aici. Cu ce vrei să te ajut astăzi?*
+  > *Poți să-mi spui direct ce ai pe suflet, sau alegem un punct de plecare:”*
+  > *— Continuăm de unde am rămas ieri*
+  > *— Am o idee nouă pe care vreau s-o notez*
+  > *— Vreau să găsesc ceva ce am discutat*
+  > *— Ajută-mă cu o întrebare sau o decizie*
 
 Aici nu construim o aplicație care afișează starea sistemului. Construim un partener care vorbește despre viața omului.
