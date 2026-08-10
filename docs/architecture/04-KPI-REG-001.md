@@ -26,9 +26,9 @@ Formulele matematice și algoritmii concreți sunt definiți ulterior în **KPI-
 
 ---
 
-## 2. Registrul oficial — 11 KPI
+## 2. Registrul oficial — 12 KPI (revizuit)
 
-Registrul oficial al Nivelului 6 conține **11 indicatori**, confirmați în Master Architecture:
+Registrul oficial conține **12 indicatori** — cei 11 din Master Architecture, plus ORE (reactivat, origine confirmată în Event Catalog, v. §4):
 
 | # | Cod | Denumire oficială | Entitate principală | Owner Engine |
 |---|-----|---|---|---|
@@ -42,9 +42,12 @@ Registrul oficial al Nivelului 6 conține **11 indicatori**, confirmați în Mas
 | 8 | MEI | Mentoring Effectiveness Index | Leader / Partner | PerformanceEvaluationEngine |
 | 9 | TDI | Team Development Index | Team | PerformanceEvaluationEngine |
 | 10 | AMS | Autonomy Maturity Score | Partner | PerformanceEvaluationEngine |
-| 11 | **OPI** | Overall Performance Index (indicator strategic compozit) | User / Partner / Team / Leader | PerformanceEvaluationEngine |
+| 11 | **ORE** | Objection Resolution Effectiveness (reactivat) | Conversation / Objection | de confirmat |
+| 12 | **OPI** | Overall Performance Index (indicator strategic compozit) | User / Partner / Team / Leader | PerformanceEvaluationEngine |
 
-**Notă despre OPI:** OPI nu este un KPI operațional independent, ci indicatorul strategic compozit care sintetizează ceilalți 10 KPI ai Motorului 1.
+**Notă despre OPI:** OPI nu este un KPI operațional independent, ci indicatorul strategic compozit care sintetizează ceilalți 11 KPI ai Motorului 1.
+
+**PES rămâne arhivat** — fără origine demonstrată în Event Catalog. Vezi §4.
 
 ---
 
@@ -144,23 +147,39 @@ Registrul oficial al Nivelului 6 conține **11 indicatori**, confirmați în Mas
 
 ---
 
-## 4. Decizie oficială — Reconcilierea PES / ORE
+## 4. Decizie oficială — Reconcilierea PES / ORE (revizuită)
 
-**Data deciziei:** 10 august 2026
+**Data deciziei inițiale:** 10 august 2026 — **Data revizuirii:** 10 august 2026
 **Decident:** Nic (owner proiect)
 
-În modelul Business Object existent apăreau și doi indicatori suplimentari, absenți din registrul oficial de mai sus:
+În modelul Business Object existent apăreau și doi indicatori suplimentari, absenți din registrul oficial inițial de 11 KPI:
 - **PES** — Presentation Effectiveness Score
 - **ORE** — Objection Resolution Effectiveness
 
-**Investigație:** nu s-a găsit nicio sursă/conversație care să confirme originea sau intenția din spatele acestor doi indicatori. Nu există nicio suprapunere matematică demonstrată cu KPI-urile oficiale (doar legături conceptuale slabe cu CRH și PDI).
+**Investigație inițială (în conversație):** nu s-a găsit nicio sursă/conversație care să confirme originea acestor doi indicatori. Decizie inițială: ambii arhivați.
 
-**Decizie:** PES și ORE sunt **ARHIVATE**, nu fac parte din registrul activ de 11 KPI.
-- Statutul lor rămâne păstrat istoric în modelul Business Object, marcat explicit ca arhivat.
-- Motiv: fără origine confirmată, fără suprapunere demonstrată, efectul lor e absorbit conceptual de CRH și PDI.
-- Dacă în pilotul cu liderii apare o nevoie reală, documentată, de a măsura separat eficiența prezentărilor sau a rezolvării obiecțiilor, se reintroduc pe bază de evidență, nu de presupunere.
+**Verificare ulterioară, față de sursa primară** (`docs/architecture/02-business-objects-5-pillars.md`, Event Catalog: Conversation): investigația în conversație fusese incompletă — nu acoperise Event Catalog-ul complet. Verificarea directă a arătat:
 
-**Efect asupra lifecycle-ului:** blocajul de reconciliere pentru KPI-MODEL-001 este rezolvat. KPI-MODEL-001 poate trece din PROPOSED în DRAFT.
+- **ORE are origine confirmată și demonstrată.** Evenimentul `ObjectionRaised` (Business Event, Conversation → Resolved) generează automat obiectul `Objection`, declanșează workflow-ul `WF-OBJECTION-CREATE-001`, și are explicit `KPI influențați: ORE (Objection Resolution Effectiveness)`. Nu e un indicator inventat — e cablat direct în arhitectura Core.
+- **PES nu are nicio origine confirmată**, nici după verificarea completă a tuturor celor ~39 de referințe "KPI influențați" din Event Catalog-ul celor 5 piloni. Apare doar în lista generică de metric codes din schema tabelului `kpis`, fără nicio legătură cu un eveniment.
+
+**Decizie finală:**
+- **ORE se REACTIVEAZĂ** ca al 12-lea KPI oficial — vezi KPI-012 mai jos.
+- **PES rămâne ARHIVAT** — fără origine demonstrată, decizia inițială se confirmă pentru el.
+
+**Lecție de proces:** o decizie de arhivare bazată doar pe "nu găsesc sursă în conversație" nu e suficientă cât timp există documente arhitecturale primare neconsultate încă. De acum, orice decizie de arhivare/reconciliere KPI trebuie verificată explicit față de Event Catalog-ul complet, nu doar față de istoricul de chat.
+
+**Efect asupra lifecycle-ului:** blocajul de reconciliere pentru KPI-MODEL-001 este rezolvat, cu registrul corectat la 12 KPI (11 + ORE). KPI-MODEL-001 poate trece din PROPOSED în DRAFT.
+
+### KPI-012 — ORE (Objection Resolution Effectiveness)
+- **Categorie:** Relationship / Objection Handling Performance
+- **Scop:** Măsoară eficiența cu care sunt gestionate și rezolvate obiecțiile ridicate de Contact/Client în conversații.
+- **Entitate principală:** Conversation / Objection
+- **Sursă eveniment:** `ObjectionRaised` (Conversation → Resolved) → `WF-OBJECTION-CREATE-001`
+- **Engine-uri asociate:** RelationshipEngine, ObjectionEngine
+- **Owner Engine:** de confirmat (probabil PerformanceEvaluationEngine, ca ceilalți 11 — de validat)
+- **Formula:** va fi definită în KPI-MODEL-001
+- **Status:** PROPOSED
 
 ---
 
