@@ -203,4 +203,14 @@ ARCHIVED
 Trecerea în ACTIVE se realizează după finalizarea KPI-MODEL-001 + KPI-TEST-001.
 
 ---
+
+## 8. Coerență cu Living Vision
+
+Această decizie (arhivarea PES/ORE, §4) respectă **Regula Coerenței** din `docs/living-vision/01_Caracter_NicMar_OS.md`: *"Dacă nu îl ajută pe om, nu îl construim."* Doi indicatori fără origine confirmată și fără suprapunere demonstrată ar fi adăugat complexitate fără beneficiu clar pentru liderul care folosește dashboard-ul — exact ce pilonul **"Apărăm simplitatea"** cere să evităm.
+
+Orice extindere viitoare a acestui registru (KPI noi, redenumiri, restructurări) ar trebui verificată față de:
+- `docs/living-vision/00_Manifest_NicMar.md` — de ce există NicMar OS
+- `docs/living-vision/01_Caracter_NicMar_OS.md` — cei 5 piloni, cele 4 linii roșii, testul suprem al fiecărei decizii
+
+---
 *Document canonic. Înlocuiește secțiunile KPI-REG-001/KPI-MODEL-001 §3 din draftul original RULE-MODEL-001.*
