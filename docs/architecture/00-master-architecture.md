@@ -986,3 +986,8 @@ NICMAR OS
 ============================================================
 END OF MASTER ARCHITECTURE DOCUMENT
 ============================================================
+
+---
+
+**Notă adăugată — coerență cu Living Vision:**
+Deasupra tuturor nivelurilor tehnice descrise în acest document se află `docs/living-vision/00_Manifest_NicMar.md` (de ce există NicMar OS) și `docs/living-vision/01_Caracter_NicMar_OS.md` (cei 5 piloni, cele 4 linii roșii, testul suprem: *"Dacă nu îl ajută pe om, nu îl construim."*). Orice decizie arhitecturală nouă ar trebui verificată față de aceste două documente înainte de a fi înghețată.
