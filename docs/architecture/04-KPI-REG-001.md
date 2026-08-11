@@ -26,28 +26,28 @@ Formulele matematice și algoritmii concreți sunt definiți ulterior în **KPI-
 
 ---
 
-## 2. Registrul oficial — 12 KPI (revizuit)
+## 2. Registrul oficial — 13 KPI (revizuit, versiune finală)
 
-Registrul oficial conține **12 indicatori** — cei 11 din Master Architecture, plus ORE (reactivat, origine confirmată în Event Catalog, v. §4):
+**Sursă primară nouă, cea mai completă găsită**: `docs/architecture/05-competente-37-motor1.md` (fost `01_Raspuns_Mesaj.txt`), documentul care construiește secvențial toate cele 37 de competențe ale Motorului 1. Competența 36 (`Evaluarea_Performanței`) și Competența 37 (`Autonomia_Completă_a_Utilizatorului`) confirmă structura finală: **12 KPI operaționali + 1 indicator strategic compozit (OPI) care le sintetizează pe toate**.
 
-| # | Cod | Denumire oficială | Entitate principală | Owner Engine |
-|---|-----|---|---|---|
-| 1 | DIS | Daily Impact Score | User | PerformanceEvaluationEngine |
-| 2 | CRH | Customer Relationship Health | Client | CustomerRelationshipEngine |
-| 3 | PDI | Partner Development Index | Partner | PerformanceEvaluationEngine |
-| 4 | PIP | Partner Integration Progress | Partner | PerformanceEvaluationEngine |
-| 5 | OAS | Onboarding Activation Success | Partner | PerformanceEvaluationEngine |
-| 6 | ERI | Experience Reuse Index | — (v. KPI-MODEL-001) | PerformanceEvaluationEngine |
-| 7 | LRI | Leadership Readiness Index | Partner | PerformanceEvaluationEngine |
-| 8 | MEI | Mentoring Effectiveness Index | Leader / Partner | PerformanceEvaluationEngine |
-| 9 | TDI | Team Development Index | Team | PerformanceEvaluationEngine |
-| 10 | AMS | Autonomy Maturity Score | Partner | PerformanceEvaluationEngine |
-| 11 | **ORE** | Objection Resolution Effectiveness (reactivat) | Conversation / Objection | de confirmat |
-| 12 | **OPI** | Overall Performance Index (indicator strategic compozit) | User / Partner / Team / Leader | PerformanceEvaluationEngine |
+| # | Cod | Denumire oficială | Tip |
+|---|-----|---|---|
+| 1 | DIS | Daily Impact Score | operațional |
+| 2 | CRH | Customer Relationship Health | operațional |
+| 3 | PDI | Partner Development Index | operațional |
+| 4 | PIP | Partner Integration Progress | operațional |
+| 5 | OAS | Onboarding Activation Success | operațional |
+| 6 | ERI | Experience Reuse Index | operațional |
+| 7 | LRI | Leadership Readiness Index | operațional |
+| 8 | MEI | Mentoring Effectiveness Index | operațional |
+| 9 | TDI | Team Development Index | operațional |
+| 10 | AMS | Autonomy Maturity Score | operațional (introdus la Competența 37, `AutonomyEngine`) |
+| 11 | **PES** | Presentation Effectiveness Score | operațional (introdus la Competența 28/36, `PresentationEngine`) |
+| 12 | **ORE** | Objection Resolution Effectiveness | operațional (introdus la Competența 29/36, `ObjectionEngine`) |
+| 13 | **OPI** | Overall Performance Index | **strategic, compozit** — sintetizează toți cei 12 de mai sus |
 
-**Notă despre OPI:** OPI nu este un KPI operațional independent, ci indicatorul strategic compozit care sintetizează ceilalți 11 KPI ai Motorului 1.
-
-**PES rămâne arhivat** — fără origine demonstrată în Event Catalog. Vezi §4.
+**Owner Engine central pentru cei 12 operaționali:** `PerformanceEvaluationEngine` (Competența 36).
+**Owner Engine pentru OPI + orchestrarea finală:** `AutonomyEngine` (Competența 37) — folosește OPI + toți cei 12 KPI ca input pentru certificarea nivelului de autonomie.
 
 ---
 
@@ -136,50 +136,63 @@ Registrul oficial conține **12 indicatori** — cei 11 din Master Architecture,
 - **Formula:** va fi definită în KPI-MODEL-001
 - **Status:** PROPOSED
 
-### KPI-011 — OPI (Overall Performance Index)
+### KPI-011 — PES (Presentation Effectiveness Score)
+- **Categorie:** Presentation / Conversation Performance
+- **Scop:** Măsoară eficiența unei prezentări prin combinarea: nivelului de interes generat, gradului de implicare în conversație, continuării relației (follow-up sau întâlnire), autenticității percepute, progresului persoanei după prezentare.
+- **Sursă:** Competența 28 (`Prezentarea_Simplă_a_Soluțiilor`), motor propriu `PresentationEngine`
+- **Engine-uri conectate:** PresentationEngine, Motorul Relației, Motorul Continuității, Motorul Identității, CustomerRelationshipEngine, PartnerRelationshipEngine
+- **Formula:** va fi definită în KPI-MODEL-001
+- **Status:** PROPOSED
+
+### KPI-012 — ORE (Objection Resolution Effectiveness)
+- **Categorie:** Relationship / Objection Handling Performance
+- **Scop:** Măsoară eficiența cu care sunt gestionate și rezolvate obiecțiile ridicate de Contact/Client în conversații.
+- **Sursă:** Competența 29 (`Gestionarea_Obiecțiilor_Avansate`) + confirmat în Event Catalog: evenimentul `ObjectionRaised` → `WF-OBJECTION-CREATE-001`
+- **Engine-uri asociate:** RelationshipEngine, ObjectionEngine
+- **Formula:** va fi definită în KPI-MODEL-001
+- **Status:** PROPOSED
+
+### KPI-013 — AMS (Autonomy Maturity Score)
+- **Categorie:** Autonomy / Strategic Maturity
+- **Scop:** Măsoară gradul de autonomie operațională al utilizatorului, rezultat din integrarea tuturor KPI-urilor Motorului 1 și din capacitatea de a produce rezultate constante, de a dezvolta relații, parteneri și lideri folosind NicMar OS ca sistem de ghidare.
+- **Sursă:** Competența 37 (`Autonomia_Completă_a_Utilizatorului`, ultima din Motorul 1), motor `AutonomyEngine`
+- **Input-uri:** OPI + toți ceilalți 11 KPI + HabitEngine, MissionEngine, PriorityEngine, FollowUpEngine
+- **Formula:** va fi definită în KPI-MODEL-001
+- **Status:** PROPOSED
+
+### KPI-014 — OPI (Overall Performance Index)
 - **Categorie:** Overall Performance (indicator strategic compozit)
-- **Scop:** Măsoară performanța generală prin agregarea celorlalți 10 KPI ai sistemului.
+- **Scop:** Măsoară performanța generală prin agregarea celorlalți 12 KPI operaționali ai sistemului.
 - **Entități:** User (principal); Partner, Team, Leader (secundare)
-- **Input-uri:** KPI operaționali, relaționali, de dezvoltare, de leadership, de autonomie
+- **Input-uri:** toți cei 12 KPI operaționali
 - **Dashboard:** scor general, trend, componente, evoluție temporală
 - **Formula:** va fi definită în KPI-MODEL-001
 - **Status:** PROPOSED
 
 ---
 
-## 4. Decizie oficială — Reconcilierea PES / ORE (revizuită)
+## 4. Istoricul reconcilierii PES / ORE / AMS (decizie finală)
 
-**Data deciziei inițiale:** 10 august 2026 — **Data revizuirii:** 10 august 2026
-**Decident:** Nic (owner proiect)
+**Decident:** Nic (owner proiect) | **Ultima revizuire:** 10 august 2026
 
-În modelul Business Object existent apăreau și doi indicatori suplimentari, absenți din registrul oficial inițial de 11 KPI:
-- **PES** — Presentation Effectiveness Score
-- **ORE** — Objection Resolution Effectiveness
+### Etapa 1 — decizie inițială (bazată pe istoricul de conversație)
+Nu s-a găsit nicio sursă care să confirme originea PES/ORE. **Decizie:** ambii arhivați.
 
-**Investigație inițială (în conversație):** nu s-a găsit nicio sursă/conversație care să confirme originea acestor doi indicatori. Decizie inițială: ambii arhivați.
+### Etapa 2 — revizuire (bazată pe Event Catalog, `02-business-objects-5-pillars.md`)
+Verificare directă în sursă a arătat că **ORE are origine confirmată**: evenimentul `ObjectionRaised` → `WF-OBJECTION-CREATE-001` → `KPI influențați: ORE`. **PES rămâne fără sursă găsită** la acest pas. **Decizie revizuită:** ORE reactivat, PES rămâne arhivat.
 
-**Verificare ulterioară, față de sursa primară** (`docs/architecture/02-business-objects-5-pillars.md`, Event Catalog: Conversation): investigația în conversație fusese incompletă — nu acoperise Event Catalog-ul complet. Verificarea directă a arătat:
+### Etapa 3 — revizuire finală (bazată pe documentul celor 37 de competențe, `05-competente-37-motor1.md`)
+Documentul complet al Motorului 1 (37 de competențe, construite secvențial) conține definiția PES la Competența 28 (`Prezentarea_Simplă_a_Soluțiilor`), cu motor propriu `PresentationEngine`, și confirmă unificarea lui în `PerformanceEvaluationEngine` la Competența 36. **PES are, de fapt, origine solidă** — pur și simplu nu era încă documentată în fișierele consultate până la acel punct.
 
-- **ORE are origine confirmată și demonstrată.** Evenimentul `ObjectionRaised` (Business Event, Conversation → Resolved) generează automat obiectul `Objection`, declanșează workflow-ul `WF-OBJECTION-CREATE-001`, și are explicit `KPI influențați: ORE (Objection Resolution Effectiveness)`. Nu e un indicator inventat — e cablat direct în arhitectura Core.
-- **PES nu are nicio origine confirmată**, nici după verificarea completă a tuturor celor ~39 de referințe "KPI influențați" din Event Catalog-ul celor 5 piloni. Apare doar în lista generică de metric codes din schema tabelului `kpis`, fără nicio legătură cu un eveniment.
+În plus, același document introduce **AMS** ca al 12-lea KPI operațional, prin `AutonomyEngine` (Competența 37), și confirmă **OPI** ca indicator strategic compozit de nivel superior, separat de cei 12.
 
-**Decizie finală:**
-- **ORE se REACTIVEAZĂ** ca al 12-lea KPI oficial — vezi KPI-012 mai jos.
-- **PES rămâne ARHIVAT** — fără origine demonstrată, decizia inițială se confirmă pentru el.
+### Decizia finală
+Toți cei 3 indicatori sunt **activi**: PES, ORE și AMS fac parte din registrul oficial de 12 KPI operaționali + OPI compozit = **13 total**. Niciunul nu rămâne arhivat.
 
-**Lecție de proces:** o decizie de arhivare bazată doar pe "nu găsesc sursă în conversație" nu e suficientă cât timp există documente arhitecturale primare neconsultate încă. De acum, orice decizie de arhivare/reconciliere KPI trebuie verificată explicit față de Event Catalog-ul complet, nu doar față de istoricul de chat.
+### Lecție de proces (actualizată)
+O decizie de arhivare/reconciliere KPI nu poate fi considerată definitivă doar pe baza documentelor disponibile la momentul respectiv. De fiecare dată când apare un document primar nou (chiar dacă vine dintr-o sursă externă, ca acest fișier salvat separat pe Drive), registrul trebuie re-verificat. Motivul recurent al erorilor anterioare: informația exista deja, doar nu fusese încă adusă în context.
 
-**Efect asupra lifecycle-ului:** blocajul de reconciliere pentru KPI-MODEL-001 este rezolvat, cu registrul corectat la 12 KPI (11 + ORE). KPI-MODEL-001 poate trece din PROPOSED în DRAFT.
-
-### KPI-012 — ORE (Objection Resolution Effectiveness)
-- **Categorie:** Relationship / Objection Handling Performance
-- **Scop:** Măsoară eficiența cu care sunt gestionate și rezolvate obiecțiile ridicate de Contact/Client în conversații.
-- **Entitate principală:** Conversation / Objection
-- **Sursă eveniment:** `ObjectionRaised` (Conversation → Resolved) → `WF-OBJECTION-CREATE-001`
-- **Engine-uri asociate:** RelationshipEngine, ObjectionEngine
-- **Owner Engine:** de confirmat (probabil PerformanceEvaluationEngine, ca ceilalți 11 — de validat)
-- **Formula:** va fi definită în KPI-MODEL-001
-- **Status:** PROPOSED
+**Efect asupra lifecycle-ului:** KPI-MODEL-001 poate trece din PROPOSED în DRAFT cu registrul complet de 13.
 
 ---
 
