@@ -114,7 +114,7 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 | FollowUpEngine | ✅ | DIS, RPS |
 | CustomerRelationshipEngine | ✅ | CRH |
 | PartnerRelationshipEngine | ✅ | PDI, PIP |
-| RuleEvaluationEngine | ⚠️ *(fără corespondent găsit în nicio sursă primară)* | — |
+| RuleEngine *(fost `RuleEvaluationEngine`)* | ✅ — decizie confirmată 11 aug 2026 | evaluare centralizată reguli (`RULE-MODEL-001`) |
 | DailyRhythmEngine | ❌ | Misiunea Zilei |
 | ResilienceEngine | ❌ | — |
 | HabitEngine | ❌ | Consistency Index |
@@ -134,13 +134,35 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 
 ---
 
-## 4. Întrebări deschise pentru decizie (nu decise aici)
+## 4. Decizii confirmate
 
-Acest document prezintă doar faptele. Deciziile de scope MVP rămân la owner:
+### Decizia 1 — `RuleEvaluationEngine` → `RuleEngine` (confirmat 11 august 2026)
 
-1. `RuleEvaluationEngine` — se redenumește după un motor real existent, sau rămâne mecanism separat, specific MVP, fără corespondent în Core?
-2. `ObjectionEngine` — intră în MVP acum (fiindcă ORE e deja KPI activ), sau ORE rămâne în registru dar "neimplementat" până la o fază ulterioară?
-3. Restul de 12 motoare excluse din MVP — toate amânate pentru fazele următoare, sau există vreunul cu prioritate ascunsă (ex. `PriorityEngine`, foarte des citat ca dependință a altor motoare deja incluse)?
+**Constatare:** numele `RuleEvaluationEngine` nu apare în nicio sursă primară. `RULE-MODEL-001` (Document 07.1) folosește generic termenul "Rule Engine", cu rol distinct de `PerformanceEvaluationEngine` — fluxul documentat e `KPI → Threshold → Rule Engine → Decision Outcome`, deci Rule Engine vine *după* evaluarea KPI, ca pas separat.
+
+**Decizie:** motor separat, păstrat în MVP, redenumit oficial la **`RuleEngine`** (aliniat cu terminologia din Core, nu cu numele inventat în conversație). Nu se distribuie logica de evaluare a regulilor în fiecare motor individual — rămâne centralizată, conform arhitecturii deterministe din `RULE-MODEL-001`.
+
+**Motiv:** centralizarea respectă principiul "Apărăm simplitatea" din `01_Caracter_NicMar_OS.md` — logica de reguli distribuită în 18 motoare ar contrazice scopul unui document de 4918 rânduri dedicat exact evitării acestei fragmentări.
+
+**Cod actualizat:** `ENG-RULE-001` rămâne codul MVP, dar numele tehnic afișat în documentație devine `RuleEngine`, nu `RuleEvaluationEngine`.
+
+### Decizia 2 — `ObjectionEngine` intră în MVP ca al 6-lea motor (confirmat 11 august 2026)
+
+**Motiv:** ORE e deja KPI activ în `04-KPI-REG-001.md`, cu origine dublu-confirmată (Event Catalog + Competența 29). Fără `ObjectionEngine`, ORE rămâne un KPI pe care nimeni nu-l poate calcula — o gaură vizibilă în dashboard din prima zi de pilot.
+
+**Dependințe verificate:** `ObjectionEngine` depinde explicit de `CustomerRelationshipEngine` și `PartnerRelationshipEngine` — ambele deja în MVP. Nu aduce dependințe noi nerezolvate.
+
+**Limită explicită:** decizia se aplică *doar* lui `ObjectionEngine`. Nu redeschide scope-ul pentru celelalte 11 motoare excluse — planul de execuție inițial ("nu mai dezvoltăm încă celelalte 10 motoare") rămâne valabil pentru restul.
+
+**Efect asupra MVP-ENGINE-001:** lista devine 6 motoare: `MissionEngine`, `FollowUpEngine`, `CustomerRelationshipEngine`, `PartnerRelationshipEngine`, `RuleEngine`, `ObjectionEngine`.
+
+---
+
+## 6. Ultima întrebare deschisă
+
+Restul de 11 motoare excluse din MVP — toate amânate pentru fazele următoare, sau există vreunul cu prioritate ascunsă?
+
+**Un candidat de verificat, nu de decis automat: `PriorityEngine`.** E citat explicit ca "motor conectat" de 3 din cele 6 motoare deja incluse în MVP (`HabitEngine`, `FollowUpEngine`, `CustomerRelationshipEngine`), deși niciunul din ele nu-l are ca dependință *obligatorie* declarată — apare mai degrabă ca motor de coordonare/optimizare transversal (Dashboard, alocare timp), nu ca blocaj funcțional direct.
 
 ---
 *Document canonic pentru inventarul de motoare tehnice. Se coroborează cu `04-KPI-REG-001.md` (KPI) și `02-business-objects-5-pillars.md` (Event Catalog).*
