@@ -63,7 +63,7 @@ Event → Engine → Rule → Data → Agent → Human → Action
 
 ---
 
-## 4. Decizii confirmate (11 august 2026)
+## 4. Decizii confirmate (12 august 2026)
 
 1. **Sursa de voce pentru Conversation Agent — confirmată.** `Avatar_360.md` + `Limbajul_Avatarului.md` devin sursa oficială de ton pentru toate răspunsurile generate de Conversation Agent. Această legătură nu are (încă) corespondent explicit în `05-competente-37-motor1.md`, dar e acum decizie validată de owner, nu presupunere.
 
