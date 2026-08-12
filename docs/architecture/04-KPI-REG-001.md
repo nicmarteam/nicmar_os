@@ -173,7 +173,7 @@ Formulele matematice și algoritmii concreți sunt definiți ulterior în **KPI-
 
 ## 4. Istoricul reconcilierii PES / ORE / AMS (decizie finală)
 
-**Decident:** Nic (owner proiect) | **Ultima revizuire:** 10 august 2026
+**Decident:** Nic (owner proiect) | **Ultima revizuire:** 12 august 2026
 
 ### Etapa 1 — decizie inițială (bazată pe istoricul de conversație)
 Nu s-a găsit nicio sursă care să confirme originea PES/ORE. **Decizie:** ambii arhivați.
