@@ -136,7 +136,7 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 
 ## 4. Decizii confirmate
 
-### Decizia 1 — `RuleEvaluationEngine` → `RuleEngine` (confirmat 11 august 2026)
+### Decizia 1 — `RuleEvaluationEngine` → `RuleEngine` (confirmat 12 august 2026)
 
 **Constatare:** numele `RuleEvaluationEngine` nu apare în nicio sursă primară. `RULE-MODEL-001` (Document 07.1) folosește generic termenul "Rule Engine", cu rol distinct de `PerformanceEvaluationEngine` — fluxul documentat e `KPI → Threshold → Rule Engine → Decision Outcome`, deci Rule Engine vine *după* evaluarea KPI, ca pas separat.
 
@@ -146,7 +146,7 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 
 **Cod actualizat:** `ENG-RULE-001` rămâne codul MVP, dar numele tehnic afișat în documentație devine `RuleEngine`, nu `RuleEvaluationEngine`.
 
-### Decizia 2 — `ObjectionEngine` intră în MVP ca al 6-lea motor (confirmat 11 august 2026)
+### Decizia 2 — `ObjectionEngine` intră în MVP ca al 6-lea motor (confirmat 12 august 2026)
 
 **Motiv:** ORE e deja KPI activ în `04-KPI-REG-001.md`, cu origine dublu-confirmată (Event Catalog + Competența 29). Fără `ObjectionEngine`, ORE rămâne un KPI pe care nimeni nu-l poate calcula — o gaură vizibilă în dashboard din prima zi de pilot.
 
@@ -158,7 +158,7 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 
 ---
 
-### Decizia 3 — `PresentationEngine` rămâne exclus din MVP; Conversation Agent scope redus (confirmat 11 august 2026)
+### Decizia 3 — `PresentationEngine` rămâne exclus din MVP; Conversation Agent scope redus (confirmat 12 august 2026)
 
 **Context:** verificare a arătat suprapunere conceptuală clară între rolul `PresentationEngine` ("construiește prezentări personalizate... generează o conversație, nu un discurs standard") și rolul descris pentru `Conversation Agent` din MVP-AGENT-001 ("Ce îi spun? — produce mesajul concret").
 
@@ -168,7 +168,7 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 
 **Motiv:** menținerea simplității și rigorii vertical slice-ului MVP — nu orice suprapunere conceptuală justifică extinderea scope-ului. Criteriul rămâne cel aplicat la ORE (KPI activ fără motor = gaură vizibilă), nu orice paralelă tematică.
 
-### Decizia 4 — MVP acoperă strict recrutare organică; reclama plătită rămâne post-MVP (confirmat 11 august 2026)
+### Decizia 4 — MVP acoperă strict recrutare organică; reclama plătită rămâne post-MVP (confirmat 12 august 2026)
 
 **Context:** documentul de 37 de competențe descrie deja un flux complet de recrutare **organică** (postare pe Facebook/WhatsApp/Instagram/TikTok/LinkedIn → reacție/comentariu → conversație ghidată → obiecție → partener nou), fără niciun concept de reclamă plătită (Ads) în arhitectura documentată.
 
