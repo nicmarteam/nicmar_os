@@ -168,6 +168,16 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 
 **Motiv:** menținerea simplității și rigorii vertical slice-ului MVP — nu orice suprapunere conceptuală justifică extinderea scope-ului. Criteriul rămâne cel aplicat la ORE (KPI activ fără motor = gaură vizibilă), nu orice paralelă tematică.
 
+### Decizia 4 — MVP acoperă strict recrutare organică; reclama plătită rămâne post-MVP (confirmat 11 august 2026)
+
+**Context:** documentul de 37 de competențe descrie deja un flux complet de recrutare **organică** (postare pe Facebook/WhatsApp/Instagram/TikTok/LinkedIn → reacție/comentariu → conversație ghidată → obiecție → partener nou), fără niciun concept de reclamă plătită (Ads) în arhitectura documentată.
+
+**Decizie:** NicMar OS MVP acoperă exclusiv fluxul organic deja construit. Reclama plătită (Meta/Facebook Ads etc.) **nu intră în scope-ul MVP** — nu se construiește niciun agent sau motor dedicat pentru asta în această fază.
+
+**Motiv:** "Construim ceva funcțional, apoi ne extindem" — aceeași logică de secvențiere aplicată consecvent la Deciziile 1-3. Recrutarea organică e deja documentată, aliniată cu Avatar și Limbajul Avatarului; reclama plătită ar necesita conținut și validare complet noi (hook-uri de ad, targetare, buget), nevalidate încă.
+
+**Status reclamă plătită:** rămâne o extindere viitoare posibilă, de reconsiderat după ce MVP-ul organic e funcțional și testat cu liderii pilot.
+
 ---
 
 ## 6. Ultima întrebare deschisă
