@@ -158,6 +158,18 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 
 ---
 
+### Decizia 3 — `PresentationEngine` rămâne exclus din MVP; Conversation Agent scope redus (confirmat 11 august 2026)
+
+**Context:** verificare a arătat suprapunere conceptuală clară între rolul `PresentationEngine` ("construiește prezentări personalizate... generează o conversație, nu un discurs standard") și rolul descris pentru `Conversation Agent` din MVP-AGENT-001 ("Ce îi spun? — produce mesajul concret").
+
+**Decizie:** spre deosebire de `ObjectionEngine` (inclus, Decizia 2), `PresentationEngine` **rămâne exclus** din MVP, menținând strict scope-ul stabilit inițial.
+
+**Efect direct asupra `Conversation Agent`:** în MVP v1, agentul funcționează cu scope redus — acoperă gestionarea interacțiunilor și a obiecțiilor (prin `ObjectionEngine`, deja activ), **fără** generare sintetică de prezentări personalizate. Capabilitatea se adaugă într-o fază ulterioară, când `PresentationEngine` intră în scope.
+
+**Motiv:** menținerea simplității și rigorii vertical slice-ului MVP — nu orice suprapunere conceptuală justifică extinderea scope-ului. Criteriul rămâne cel aplicat la ORE (KPI activ fără motor = gaură vizibilă), nu orice paralelă tematică.
+
+---
+
 ## 6. Ultima întrebare deschisă
 
 Restul de 11 motoare excluse din MVP — toate amânate pentru fazele următoare, sau există vreunul cu prioritate ascunsă?
