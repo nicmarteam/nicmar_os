@@ -1,6 +1,6 @@
 # MVP-AGENT-001 — Arhitectura celor 4 Agenți MVP
 
-**Status:** DRAFT — pregătit pentru validare
+**Status:** DRAFT VALIDAT — cele 4 puncte deschise confirmate de owner (v. secțiunea 4)
 **Depinde de:** `06-harta-motoare-tehnice.md` (6 motoare MVP), `04-KPI-REG-001.md` (13 KPI)
 **Notă de proveniență:** Conceptul de "Agent" nu are sursă primară confirmată în `02-business-objects-5-pillars.md` sau `05-competente-37-motor1.md` — provine din auditul de execuție (conversație). Contractul Human-in-the-loop, în schimb, **este confirmat masiv în sursa primară** (49 de puncte de confirmare explicită în cele 37 de competențe, sub principiul numit chiar în document "Legea Primului Pas" / "Legea Însoțirii").
 
@@ -63,11 +63,37 @@ Event → Engine → Rule → Data → Agent → Human → Action
 
 ---
 
-## 4. Ce rămâne deschis (nedecis aici)
+## 4. Decizii confirmate (11 august 2026)
 
-1. **Confirmarea sursei de voce pentru Conversation Agent** — folosim `Avatar_360.md` + `Limbajul_Avatarului.md` ca sursă oficială de ton, sau alt document?
-2. **Ordinea de construcție** — auditul de execuție propunea inițial: Contact Agent → Conversation Agent → FollowUp Agent → Mission Agent, ca prim vertical slice complet funcțional. Rămâne valabilă această ordine?
-3. **Numărul de agenți** — 4 rămâne o alegere de conveniență, nu o lege arhitecturală (v. notă de proveniență). Dacă în pilotul cu liderii apare nevoia unui al 5-lea, se adaugă pe bază de evidență, nu presupunere — aceeași disciplină aplicată la motoare.
+1. **Sursa de voce pentru Conversation Agent — confirmată.** `Avatar_360.md` + `Limbajul_Avatarului.md` devin sursa oficială de ton pentru toate răspunsurile generate de Conversation Agent. Această legătură nu are (încă) corespondent explicit în `05-competente-37-motor1.md`, dar e acum decizie validată de owner, nu presupunere.
+
+2. **Ordinea de construcție — confirmată.** Contact Agent → Conversation Agent → FollowUp Agent → Mission Agent, ca prim vertical slice complet funcțional, conform planului din auditul de execuție inițial.
+
+3. **Numărul de agenți — 4 pentru MVP, explicit provizoriu.** Owner-ul confirmă: *"acum 4 agenți, dar vor fi mult mai mulți agenți"*. Cei 4 nu sunt o limită arhitecturală, ci punctul de plecare al vertical slice-ului MVP. Extinderea ulterioară e așteptată, nu excepțională — probabil unul per motor din cele 13 rămase post-MVP (`07-motoare-post-mvp.md`), pe măsură ce fiecare motor intră în scope.
+
+---
+
+## 5. Hartă orientativă pentru extindere viitoare (neconfirmată, doar pregătitoare)
+
+Pe măsură ce motoarele din `07-motoare-post-mvp.md` intră în scope, fiecare pare să aibă un agent-pereche natural — **listă informativă, nu decizie**:
+
+| Motor post-MVP | Agent-pereche probabil |
+|---|---|
+| PresentationEngine | Presentation Agent |
+| ObjectionEngine *(deja MVP)* | *(deja acoperit de Conversation Agent)* |
+| PartnerOnboardingEngine | Onboarding Agent |
+| PartnerIntegrationEngine | Integration Agent |
+| MentorGuidanceEngine | Mentor Agent |
+| TeamCoordinationEngine | Team Agent |
+| LeadershipDevelopmentEngine | Leadership Agent |
+| HabitEngine | Habit Agent |
+| DailyRhythmEngine | Rhythm Agent |
+| PriorityEngine | Priority Agent |
+| ResilienceEngine | Resilience Agent |
+| ExperienceLibraryEngine | Experience Agent |
+| PerformanceEvaluationEngine / AutonomyEngine | Performance/Autonomy Agent (probabil orchestrator, nu agent operațional) |
+
+Aceasta e doar o observație structurală, de păstrat pentru referință — fiecare intrare trebuie tratată cu același rigoare (verificare surse, decizie explicită) ca cei 4 agenți actuali, nu implementată automat pe baza acestui tabel.
 
 ---
 *Document DRAFT. Necesită confirmare pe cele 3 puncte deschise înainte de trecerea la implementare.*
