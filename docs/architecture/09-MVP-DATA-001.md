@@ -209,7 +209,36 @@ CREATE TABLE rules (
 );
 ```
 
-### 5.2. `state_history`
+### 5.2. `rule_evaluations` (adăugat — audit P3, 12 august 2026)
+**Decizie de audit:** obligatoriu în MVP, nu conceptual/post-MVP. `RULE-MODEL-001` (secțiunea 21-23) definește persistența evaluărilor ca cerință fermă, necondiționată de scope MVP (documentul nu face nicio distincție MVP/full-architecture). `RuleEngine` e deja motor activ în MVP (Decizia 1); fără acest tabel, se pierde trasabilitatea versiunii regulii care a produs fiecare decizie — informație pe care `audit_log` (tabel generic, pentru toate motoarele) nu o poate substitui.
+
+**Schema preluată exact din `RULE-MODEL-001`, secțiunea 21 (Rule Evaluation Persistence)**, fără modificări:
+```sql
+CREATE TABLE rule_evaluations (
+    evaluation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rule_id UUID NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
+    rule_code TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    target_object_type TEXT NOT NULL,
+    target_object_id UUID NOT NULL,
+    trigger_event TEXT,
+    result TEXT NOT NULL,
+    outcome_code TEXT,
+    score NUMERIC,
+    context_payload JSONB DEFAULT '{}'::jsonb,
+    result_payload JSONB DEFAULT '{}'::jsonb,
+    correlation_id UUID,
+    actor_id UUID,
+    evaluated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX idx_rule_evaluations_rule ON rule_evaluations(rule_code, rule_version);
+CREATE INDEX idx_rule_evaluations_target ON rule_evaluations(target_object_type, target_object_id);
+```
+
+**Relația cu `audit_log` (clarificare, nu suprapunere):** `rule_evaluations` e istoricul specializat al evaluărilor de reguli (cu versiune, scor, obiect țintă exact) — `audit_log` rămâne audit generic, cross-engine, pentru execuții și decizii la nivel de motor, nu de regulă individuală. Fluxul confirmat: `rules → rule_evaluations → events → audit_log`.
+
+### 5.3. `state_history`
 ```sql
 CREATE TABLE state_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -224,7 +253,7 @@ CREATE TABLE state_history (
 CREATE INDEX idx_state_history_entity ON state_history(entity_type, entity_id);
 ```
 
-### 5.3. `audit_log`
+### 5.4. `audit_log`
 **Corectură aplicată (audit 12 august 2026):** referință redenumită din `RuleEvaluationEngine` (nume rezidual, neactualizat) în `RuleEngine`, aliniat cu Decizia 1 din `06-harta-motoare-tehnice.md`.
 ```sql
 CREATE TABLE audit_log (
@@ -241,7 +270,7 @@ CREATE INDEX idx_audit_engine ON audit_log(engine_id, created_at DESC);
 ```
 *(Înregistrează execuțiile critice ale motoarelor și deciziile luate de `RuleEngine`.)*
 
-### 5.4. `events`
+### 5.5. `events`
 ```sql
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
