@@ -3,8 +3,8 @@
 **Identificator:** `MVP-DATA-001`
 **Business Domain:** NicMar OS / MVP Core
 **Nivel:** Data Architecture & Persistence
-**Versiune:** 1.1 (corectată, 12 august 2026)
-**Status:** 🔒 VALIDAT — cele 3 corecturi de audit aplicate
+**Versiune:** 1.3 (corectată, 12 august 2026)
+**Status:** 🔒 VALIDAT — toate corecturile de audit aplicate (16 tabele)
 **SSOT Sursă:** `MVP-CORE-001`, `06-harta-motoare-tehnice.md`, `04-KPI-REG-001.md`, `03-rule-model-001.md`
 **Metodologie:** MVP Vertical Slice / Deterministic Persistence & Audit
 
@@ -243,7 +243,46 @@ CREATE INDEX idx_rule_evaluations_target ON rule_evaluations(target_object_type,
 
 **Relația cu `audit_log` (clarificare, nu suprapunere):** `rule_evaluations` e istoricul specializat al evaluărilor de reguli (cu versiune, scor, obiect țintă exact) — `audit_log` rămâne audit generic, cross-engine, pentru execuții și decizii la nivel de motor, nu de regulă individuală. Fluxul confirmat: `rules → rule_evaluations → events → audit_log`.
 
-### 5.3. `state_history`
+### 5.3. `kpis` (adăugat — audit G4, 12 august 2026)
+**Decizie de audit:** obligatoriu în MVP, preluat identic din contractul canonic al Core-ului (`01-business-objects-database.md`, punctul 24), nu inventat. Registrul persistent al definițiilor KPI — nu face KPI-urile dinamice/configurabile în MVP, doar oferă ancora (`kpi_id`) către care `scores` face referință.
+```sql
+CREATE TABLE kpis (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    metric_code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    entity_type TEXT,
+    status TEXT NOT NULL DEFAULT 'PROPOSED',
+    calculation_rule_id UUID REFERENCES rules(id) ON DELETE SET NULL,
+    context_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+```
+**Populare inițială:** cele 13 `metric_code` din `04-KPI-REG-001.md` (`DIS, CRH, PDI, PIP, OAS, ERI, LRI, MEI, TDI, AMS, PES, ORE, OPI`), fără modificare a listei sau formulelor.
+
+### 5.4. `scores` (adăugat — audit G4, 12 august 2026)
+**Decizie de audit:** rezolvă ruptura de trasabilitate descoperită la testarea micro-lanțului Partner (`KPI definit → folosit de Agent → fără loc de persistare`). Confirmat de `KPI-MODEL-001` (`03-rule-model-001.md`, linia 4227): *"KPI-urile sunt calculate de motoarele responsabile și persistate pentru analiză, dashboard-uri și raportare"* — cerință explicită, nu opțională. Preluat identic din Core (`01-business-objects-database.md`, punctul 27). Tabel generic — `entity_type`/`entity_id` funcționează pentru orice Business Object (Partner, Contact, Client etc.), fără tabel separat per obiect.
+```sql
+CREATE TABLE scores (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kpi_id UUID NOT NULL REFERENCES kpis(id) ON DELETE CASCADE,
+    entity_type TEXT NOT NULL,
+    entity_id UUID NOT NULL,
+    score_value NUMERIC NOT NULL,
+    calculated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    engine_source TEXT,
+    context_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX idx_scores_kpi ON scores(kpi_id);
+CREATE INDEX idx_scores_entity ON scores(entity_type, entity_id);
+CREATE INDEX idx_scores_calculated_at ON scores(calculated_at DESC);
+```
+**Lanț confirmat prin acest tabel:** `Engine → calculează KPI → kpis (definiție) → scores (valoare, în timp) → Agent / Dashboard / Rules`.
+
+### 5.5. `state_history`
 ```sql
 CREATE TABLE state_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -258,7 +297,7 @@ CREATE TABLE state_history (
 CREATE INDEX idx_state_history_entity ON state_history(entity_type, entity_id);
 ```
 
-### 5.4. `audit_log`
+### 5.6. `audit_log`
 **Corectură aplicată (audit 12 august 2026):** referință redenumită din `RuleEvaluationEngine` (nume rezidual, neactualizat) în `RuleEngine`, aliniat cu Decizia 1 din `06-harta-motoare-tehnice.md`.
 ```sql
 CREATE TABLE audit_log (
@@ -275,7 +314,7 @@ CREATE INDEX idx_audit_engine ON audit_log(engine_id, created_at DESC);
 ```
 *(Înregistrează execuțiile critice ale motoarelor și deciziile luate de `RuleEngine`.)*
 
-### 5.5. `events`
+### 5.7. `events`
 ```sql
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -294,8 +333,8 @@ CREATE INDEX idx_events_name_time ON events(event_name, created_at DESC);
 ## 6. Status final
 
 **Document:** `MVP-DATA-001`
-**Versiune:** 1.1
-**Status:** 🔒 VALIDAT — toate cele 3 corecturi de audit aplicate (reducere stări documentată explicit, `RuleEngine` corectat, `conversations.status` adăugat)
+**Versiune:** 1.3
+**Status:** 🔒 VALIDAT — toate corecturile de audit aplicate: reducere stări documentată explicit (P4, Contact/Partner/Client/Mission/Conversation), `RuleEngine` corectat, `conversations.status` adăugat cu `FOLLOWUP_NEEDED` (P4), `rule_evaluations` adăugat (P3), `follow_ups.status` cu `CHECK` complet (G3), `kpis` + `scores` adăugate pentru persistența transversală a celor 13 KPI (G4) — **16 tabele total**
 **Rol:** schema de persistență PostgreSQL pentru MVP Core și Motoare, aliniată cu `06-harta-motoare-tehnice.md` și `04-KPI-REG-001.md`.
 
 ---
