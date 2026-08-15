@@ -186,5 +186,7 @@ Restul de 11 motoare excluse din MVP — toate amânate pentru fazele următoare
 
 **Un candidat de verificat, nu de decis automat: `PriorityEngine`.** E citat explicit ca "motor conectat" de 3 din cele 6 motoare deja incluse în MVP (`HabitEngine`, `FollowUpEngine`, `CustomerRelationshipEngine`), deși niciunul din ele nu-l are ca dependință *obligatorie* declarată — apare mai degrabă ca motor de coordonare/optimizare transversal (Dashboard, alocare timp), nu ca blocaj funcțional direct.
 
+**Actualizare P11 (12 august 2026):** pentru Partner Agent, dependința e obligatorie (selecția partenerului prioritar, Competența 27, Ecranul 1), dar acoperită printr-o **Priority capability** la nivel de Agent, cu date MVP existente (`PDI`, timp de la ultima interacțiune), fără `PriorityEngine` complet — v. `08-MVP-AGENT-001.md`, Agent 5. Verdictul rămâne neschimbat: `PriorityEngine` ❌, în afara celor 6 motoare MVP.
+
 ---
 *Document canonic pentru inventarul de motoare tehnice. Se coroborează cu `04-KPI-REG-001.md` (KPI) și `02-business-objects-5-pillars.md` (Event Catalog).*
