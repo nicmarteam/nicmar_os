@@ -148,13 +148,14 @@ CREATE INDEX idx_missions_owner_status ON missions(owner_id, status, scheduled_a
 ```
 
 ### 4.7. `follow_ups`
+**Corectură aplicată (audit G3, 12 august 2026):** `status` primește `CHECK` constraint explicit — câmpul era complet nevalidat (`TEXT` liber). `FollowUp` nu are State Machine dedicată în Core (obiect operațional secundar, ca `Meeting`/`Objection`), dar spre deosebire de `Meeting`, `FollowUpEngine` și `FollowUp Agent` sunt deja MVP activ și folosesc acest tabel — motiv suficient pentru corectare acum, nu FOLLOW-UP. Valorile derivate strict din dovezi (`08-MVP-AGENT-001.md` + `05-competente-37-motor1.md`, Competența `06_Follow_Up`): `PENDING` (așteaptă acțiunea), `COMPLETED` (confirmat de lider ca realizat), `POSTPONED` (lider a ales "mai târziu"), `RESCHEDULED` (reprogramat pentru alt moment).
 ```sql
 CREATE TABLE follow_ups (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
     conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
-    status TEXT NOT NULL DEFAULT 'PENDING',
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'COMPLETED', 'POSTPONED', 'RESCHEDULED')),
     scheduled_at TIMESTAMPTZ NOT NULL,
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
