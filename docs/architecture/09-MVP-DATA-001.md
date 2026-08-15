@@ -28,6 +28,10 @@
 | Contact | New → Active → Engaged → Qualified → Converted → Managed → Archived (7 stări) | `NEW, ACTIVE, CONVERTED, ARCHIVED` (4) |
 | Partner | Activated → Onboarding → Active → Developing → Autonomous → Leader → Mentor → Archived (8 stări) | `ACTIVATED, ACTIVE, ARCHIVED` (3) |
 | Client | Converted → Active → Loyal → AtRisk → Churned → Reactivated → Archived (7 stări) | `CONVERTED, ACTIVE, ARCHIVED` (3) |
+| Mission | Generated → Assigned → InProgress → Completed → Skipped → Expired → Archived (7 stări) | `GENERATED, ASSIGNED, IN_PROGRESS, COMPLETED` (4) |
+| Conversation | Initiated → Active → Waiting → FollowUpNeeded → Resolved → Closed → Archived (7 stări) | `INITIATED, ACTIVE, WAITING, FOLLOWUP_NEEDED, RESOLVED, ARCHIVED` (6) |
+
+**Notă audit P4 (12 august 2026):** Mission și Conversation au fost adăugate în acest tabel după verificare explicită de dependențe funcționale (Engine/Event/KPI), nu doar prin analogie cu Contact/Partner/Client. Pentru Mission, cele 3 stări excluse (`Skipped`, `Expired`, `Archived`) sunt gestionate exclusiv de motoare din afara celor 6 MVP (`ContinuityEngine`, `RelationshipEngine`) — excludere confirmată sigură. Pentru Conversation, `FollowUpNeeded` a fost inițial exclusă tăcut, dar verificarea a arătat o ruptură funcțională reală (`FollowUpEngine` + `MissionEngine`, ambele MVP, depind de tranziția spre această stare) — motiv pentru care a fost recuperată; doar `Closed` rămâne exclusă, fiind legată exclusiv de `RelationshipEngine` (neconfirmat în MVP).
 
 **Motiv arhitectural:** în prima versiune funcțională, stările intermediare sunt gestionate prin activitatea motoarelor, interacțiuni și misiuni, fără să complice mașina de stări a bazei de date. Stările complete din Core rămân valabile pentru fazele post-MVP, când motoarele corespunzătoare (`PartnerOnboardingEngine`, `PartnerIntegrationEngine`, `LeadershipDevelopmentEngine` etc., v. `07-motoare-post-mvp.md`) intră în scope.
 
@@ -106,14 +110,14 @@ CREATE INDEX idx_partners_owner_status ON partners(owner_id, status);
 ```
 
 ### 4.5. `conversations`
-**Corectură aplicată (audit 12 august 2026):** adăugată coloana `status`, absentă în draftul inițial — fără ea, motoarele ar fi trebuit să interogheze constant istoricul brut de evenimente ca să afle dacă o conversație e încă deschisă.
+**Corectură aplicată (audit P4, 12 august 2026):** `FOLLOWUP_NEEDED` recuperat în schema de stări — exclus inițial fără să fie declarat explicit, dar verificarea a arătat o ruptură funcțională reală: `FollowUpTriggered` (evenimentul care declanșează crearea automată a unui Follow-up) depinde de tranziția `Waiting → FollowUpNeeded`, iar motoarele care reacționează la el (`FollowUpEngine`, `MissionEngine`) sunt ambele confirmate în cele 6 motoare MVP. `Closed` rămâne exclus — motorul care-l gestionează (`RelationshipEngine`, generic) nu e confirmat în cele 6 MVP, iar evenimentul asociat nu influențează niciun KPI direct.
 ```sql
 CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
     channel TEXT NOT NULL DEFAULT 'WHATSAPP',
-    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('INITIATED', 'ACTIVE', 'WAITING', 'RESOLVED', 'ARCHIVED')),
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('INITIATED', 'ACTIVE', 'WAITING', 'FOLLOWUP_NEEDED', 'RESOLVED', 'ARCHIVED')),
     summary TEXT,
     raw_payload JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
