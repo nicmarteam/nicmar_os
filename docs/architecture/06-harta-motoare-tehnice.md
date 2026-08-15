@@ -59,68 +59,68 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 ### `PresentationEngine`
 - **Responsabilități:** construiește prezentări personalizate, scurte, naturale — generează o conversație, nu un discurs standard.
 - **Legătură KPI:** alimentează **PES** (Presentation Effectiveness Score) — v. `04-KPI-REG-001.md`.
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `ObjectionEngine`
 - **Responsabilități:** analizează preocupările exprimate de persoane/clienți/parteneri, construiește răspunsuri autentice. Obiectivul e construirea încrederii, nu câștigarea unei dezbateri.
 - **Intrări:** tipul preocupării, istoricul relației, Motorul Identității, CustomerRelationshipEngine, PartnerRelationshipEngine.
 - **Legătură KPI:** alimentează **ORE** (Objection Resolution Effectiveness) — confirmat și în Event Catalog (`02-business-objects-5-pillars.md`).
-- ❌ Nu e în cele 5 motoare MVP inițiale — deși KPI-ul lui (ORE) e activ în registru.
+- ✅ Inclus — v. Decizia 2 (ObjectionEngine adăugat ca al 6-lea motor, ORE activ în registru).
 
 ### `PartnerOnboardingEngine`
 - **Responsabilități:** coordonează transformarea unei persoane interesate într-un partener activ — activare, verificarea pașilor, inițializarea traseului de dezvoltare, sincronizarea motoarelor implicate.
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `PartnerIntegrationEngine`
 - **Responsabilități:** coordonează integrarea completă a partenerului nou — personalizarea onboarding-ului, sincronizarea motoarelor operaționale, monitorizarea progresului, detectarea timpurie a blocajelor, accelerarea autonomiei.
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `MentorGuidanceEngine`
 - **Responsabilități:** coordonează procesul de mentorat — nu spune mentorului ce să facă pas cu pas, ci îl ajută să ia decizii bune folosind istoricul partenerului, profilul identitar, competențele parcurse, ritmul de dezvoltare.
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `TeamCoordinationEngine`
 - **Responsabilități:** coordonează dezvoltarea echipei prin prioritizarea intervențiilor liderului, optimizează raportul timp investit / impact.
 - **Intrări:** MentorGuidanceEngine.
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `LeadershipDevelopmentEngine`
 - **Responsabilități:** coordonează identificarea, dezvoltarea și maturizarea viitorilor lideri din echipă.
 - **Intrări:** TeamCoordinationEngine.
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `ExperienceLibraryEngine`
 - **Responsabilități:** colectează experiențele validate, le clasifică, elimină duplicate, recomandă experiențe similare, identifică cele mai eficiente practici, alimentează Motorul de Învățare.
 - **Context:** introdus la Competența 35, marcată explicit ca "începutul inteligenței colective din NicMar OS."
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `PerformanceEvaluationEngine`
 - **Rol:** orchestrator central al stratului de performanță — unifică cei 12 KPI operaționali (v. `04-KPI-REG-001.md`).
 - **Introdus la:** Competența 36.
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ### `AutonomyEngine`
 - **Rol:** orchestratorul final — agregă toți cei 13 KPI (inclusiv OPI, AMS), certifică nivelul de autonomie al utilizatorului.
 - **Introdus la:** Competența 37 (ultima competență a Motorului 1).
-- ❌ Nu e în cele 5 motoare MVP inițiale.
+- ❌ Nu e în cele 6 motoare MVP confirmate (v. Decizia 2, Decizia 3).
 
 ---
 
-## 3. Tabel-sumar: MVP inițial vs. realitatea din Core
+## 3. Tabel-sumar: cele 6 motoare MVP vs. restul din Core
 
-| Motor tehnic | În cele 5 MVP inițiale? | KPI/rol legat |
+| Motor tehnic | În cele 6 MVP? | KPI/rol legat |
 |---|---|---|
 | MissionEngine | ✅ | DIS |
 | FollowUpEngine | ✅ | DIS, RPS |
 | CustomerRelationshipEngine | ✅ | CRH |
 | PartnerRelationshipEngine | ✅ | PDI, PIP |
-| RuleEngine *(fost `RuleEvaluationEngine`)* | ✅ — decizie confirmată 11 aug 2026 | evaluare centralizată reguli (`RULE-MODEL-001`) |
+| RuleEngine *(fost `RuleEvaluationEngine`)* | ✅ — Decizia 1 | evaluare centralizată reguli (`RULE-MODEL-001`) |
+| ObjectionEngine | ✅ — Decizia 2 | **ORE** |
 | DailyRhythmEngine | ❌ | Misiunea Zilei |
 | ResilienceEngine | ❌ | — |
 | HabitEngine | ❌ | Consistency Index |
 | PriorityEngine | ❌ | — |
 | PresentationEngine | ❌ | **PES** |
-| ObjectionEngine | ❌ | **ORE** |
 | PartnerOnboardingEngine | ❌ | OAS |
 | PartnerIntegrationEngine | ❌ | PIP |
 | MentorGuidanceEngine | ❌ | MEI |
@@ -130,7 +130,7 @@ Documentul de 37 de competențe folosește frecvent **etichete narative în rom�
 | PerformanceEvaluationEngine | ❌ | toți cei 12 |
 | AutonomyEngine | ❌ | OPI, AMS |
 
-**Constatare factuală:** doar 4 din cele 18 motoare confirmate în Core sunt incluse în cele 5 motoare MVP inițiale. Al 5-lea motor din lista MVP (`RuleEvaluationEngine`) nu are corespondent confirmat în nicio sursă primară verificată până acum.
+**Constatare finală:** din cele 18 motoare confirmate în Core, **6 sunt incluse în MVP** (v. Decizia 1 — `RuleEngine`, Decizia 2 — `ObjectionEngine`): `MissionEngine`, `FollowUpEngine`, `CustomerRelationshipEngine`, `PartnerRelationshipEngine`, `RuleEngine`, `ObjectionEngine`. Restul de 12 rămân post-MVP (v. `07-motoare-post-mvp.md`).
 
 ---
 
