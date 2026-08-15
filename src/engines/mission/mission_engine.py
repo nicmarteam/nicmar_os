@@ -2,7 +2,12 @@
 MissionEngine — motorul de misiuni pentru NicMar OS.
 
 Sursă: MISSION-VERTICAL-SLICE-CONTRACT v1, secțiunile 1.4, 1.8, 1.9, 1.10.
-Cod oficial: ENG-MISSION-001 (confirmat în 03-rule-model-001.md).
+Cod motor: ENG-MISSION-001 — plauzibil, nu pe deplin confirmat (corectură
+de consecvență, 12 august 2026 — apare doar ca valoare de exemplu în
+03-rule-model-001.md, secțiunea Rule Ownership, sub "Exemplu:", aceeași
+categorie de încredere ca ENG-FOLLOWUP-XXX din followup_engine.py, care
+a rămas explicit "neconfirmat". Tratarea inconsecventă anterioară — acest
+cod numit "confirmat" — a fost o supra-afirmare, corectată acum.)
 
 Lanț implementat:
     RuleEngine → MISSION_READY/BLOCKED → MissionEngine → missions →
