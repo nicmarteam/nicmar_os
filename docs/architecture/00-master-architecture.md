@@ -62,6 +62,32 @@ INFRASTRUCTURE
 
 
 ============================================================
+1.1. INDEX DOCUMENTE SPECIALIZATE (MVP)
+============================================================
+
+Acest Master este documentul de orientare și status al arhitecturii complete
+(18 niveluri). Pentru scope-ul MVP, sursa de adevăr actuală și validată este
+în documentele specializate de mai jos — Master-ul nu le duplică, doar
+referențiază.
+
+`docs/architecture/04-KPI-REG-001.md`
+Registrul oficial de 13 KPI (12 operaționali + OPI), validat.
+
+`docs/architecture/06-harta-motoare-tehnice.md`
+Harta celor 18 motoare tehnice confirmate în Core; cele 6 motoare MVP.
+
+`docs/architecture/07-motoare-post-mvp.md`
+Specificații tehnice pentru cele 13 motoare rămase, în afara MVP.
+
+`docs/architecture/08-MVP-AGENT-001.md`
+Arhitectura celor 4 agenți MVP (Contact, Conversation, FollowUp, Mission).
+
+`docs/architecture/09-MVP-DATA-001.md`
+Schema PostgreSQL completă pentru MVP — 14 tabele, inclusiv subseturile
+validate de stări (Contact, Partner, Client, Mission, Conversation).
+
+
+============================================================
 2. NIVELUL 0 – BUSINESS FOUNDATION
 ============================================================
 
@@ -784,19 +810,19 @@ STATUS: DERIVAT
 
 DB-STATE-001
 State Persistence Model
-STATUS: DERIVAT / PENTRU VALIDARE
+STATUS: VALIDAT (MVP) — tabelul `state_history` și subseturile MVP de stări (Contact, Partner, Client, Mission, Conversation) sunt documentate și validate în `docs/architecture/09-MVP-DATA-001.md`
 
 DB-EVENT-001
 Event Store Model
-URMEAZĂ
+STATUS: IMPLEMENTAT (MVP) — tabelul `events` există complet în `docs/architecture/09-MVP-DATA-001.md`
 
 DB-AUDIT-001
 AuditLog Model
-URMEAZĂ
+STATUS: IMPLEMENTAT (MVP) — tabelul `audit_log` există complet în `docs/architecture/09-MVP-DATA-001.md`
 
 DB-KPI-001
 KPI & Score Model
-URMEAZĂ
+STATUS: IMPLEMENTAT (MVP) — registrul complet de 13 KPI există în `docs/architecture/04-KPI-REG-001.md`
 
 DB-INT-001
 Database Integrity & Indexing
