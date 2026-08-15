@@ -16,13 +16,17 @@ Documentul de 37 de competențe arată un tipar consecvent, repetat de 49 de ori
 
 ## 2. Cei 4 agenți
 
-### Agent 1 — Contact Agent
+### Agent 1 — Contact Agent (contract corectat — audit P6, 12 august 2026)
 - **Întrebare:** *"Pe cine merită să contactez astăzi?"*
-- **Motoare sursă:** `CustomerRelationshipEngine`, `PartnerRelationshipEngine`
+- **Motoare sursă:**
+  - `RelationshipEngine` — **READ-ONLY**: status curent, istoric, ultima interacțiune (State Owner real al Contact în `02-business-objects-5-pillars.md`, linia 237)
+  - `CustomerRelationshipEngine` — context pentru contactele convertite în Client
+  - `PartnerRelationshipEngine` — context pentru contactele convertite în Partner
 - **Input:** stare Contact/Client/Partner, ultima interacțiune, istoric, engagement, follow-up-uri restante, etapa relației
 - **KPI relevanți:** CRH, PDI, PIP
 - **Output:** listă prioritizată de contacte + motiv scurt pentru fiecare ("de ce azi, de ce el/ea")
 - **Human-in-the-loop:** liderul vede lista, alege pe cine contactează, nimic nu se trimite automat
+- **Limită explicită (corectură P6):** Contact Agent **nu modifică niciodată starea Contactului**. Tranzițiile (`New→Active→Engaged→Qualified`) rămân declanșate exclusiv de evenimentele reale de interacțiune (`FirstInteractionOccurred`, `InterestDetected`, `QualificationCompleted`), nu de recomandarea Agentului. `RelationshipEngine` nu devine motor MVP complet — doar capacitatea lui de citire e folosită aici; cele 6 motoare MVP din `06-harta-motoare-tehnice.md` rămân neschimbate.
 
 ### Agent 2 — Conversation Agent (scope redus, confirmat Decizia 3)
 - **Întrebare:** *"Ce îi spun?"*
