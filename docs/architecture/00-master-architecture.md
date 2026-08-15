@@ -727,6 +727,7 @@ STATUS: ÎNCHIS
 ETAPA 2
 Document 04 – Database Architecture
 STATUS: ÎN CONSTRUCȚIE
+MVP: VALIDAT — v. `09-MVP-DATA-001.md`
 
 ETAPA 3
 Document 05 – Workflow Engine
@@ -735,14 +736,17 @@ URMEAZĂ
 ETAPA 4
 Document 06 – Engine Architecture
 URMEAZĂ
+MVP: VALIDAT — v. `06-harta-motoare-tehnice.md`
 
 ETAPA 5
 Document 07 – Rules & Decision Engine
 URMEAZĂ
+MVP: VALIDAT — v. `03-rule-model-001.md`
 
 ETAPA 6
 Document 08 – KPI & Scoring
 URMEAZĂ
+MVP: VALIDAT — v. `04-KPI-REG-001.md`
 
 ETAPA 7
 Document 09 – Identity & Security
@@ -759,6 +763,7 @@ URMEAZĂ
 ETAPA 10
 Document 12 – AI & Agents
 URMEAZĂ
+MVP: VALIDAT — v. `08-MVP-AGENT-001.md`
 
 ETAPA 11
 Document 13 – Application
