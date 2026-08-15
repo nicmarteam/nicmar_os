@@ -112,15 +112,7 @@ Formulele matematice și algoritmii concreți sunt definiți ulterior în **KPI-
 - **Formula:** va fi definită în KPI-MODEL-001
 - **Status:** PROPOSED
 
-### KPI-008 — AMS (Autonomy Maturity Score)
-- **Categorie:** Partner Maturity / Autonomy
-- **Scop:** Măsoară nivelul de maturitate și autonomie operațională al partenerului.
-- **Business Objects relevante:** Partner, Mission, Habit, Assessment, Leader, Team
-- **Engine-uri asociate:** PartnerRelationshipEngine, MentorGuidanceEngine, ContinuityEngine, LeadershipDevelopmentEngine
-- **Formula:** va fi definită în KPI-MODEL-001
-- **Status:** PROPOSED
-
-### KPI-009 — MEI (Mentoring Effectiveness Index)
+### KPI-008 — MEI (Mentoring Effectiveness Index)
 - **Categorie:** Mentoring / Leadership Development
 - **Scop:** Măsoară eficiența activității de mentorat în dezvoltarea partenerilor și liderilor.
 - **Business Objects relevante:** Partner, Leader, Team, Mission, Assessment, Experience
@@ -128,11 +120,21 @@ Formulele matematice și algoritmii concreți sunt definiți ulterior în **KPI-
 - **Formula:** va fi definită în KPI-MODEL-001
 - **Status:** PROPOSED
 
-### KPI-010 — TDI (Team Development Index)
+### KPI-009 — TDI (Team Development Index)
 - **Categorie:** Team Development
 - **Scop:** Măsoară dezvoltarea și evoluția unei echipe.
 - **Business Objects relevante:** Team, Partner, Leader, Mission, Assessment, KPI, Score
 - **Owner Engine:** PerformanceEvaluationEngine
+- **Formula:** va fi definită în KPI-MODEL-001
+- **Status:** PROPOSED
+
+### KPI-010 — AMS (Autonomy Maturity Score)
+- **Categorie:** Autonomy / Strategic Maturity
+- **Scop:** Măsoară gradul de autonomie operațională al utilizatorului/partenerului, rezultat din integrarea tuturor KPI-urilor Motorului 1 și din capacitatea de a produce rezultate constante, de a dezvolta relații, parteneri și lideri folosind NicMar OS ca sistem de ghidare.
+- **Business Objects relevante:** Partner, Mission, Habit, Assessment, Leader, Team
+- **Sursă:** Competența 37 (`Autonomia_Completă_a_Utilizatorului`, ultima din Motorul 1), motor `AutonomyEngine`
+- **Engine-uri asociate:** PartnerRelationshipEngine, MentorGuidanceEngine, LeadershipDevelopmentEngine, AutonomyEngine
+- **Input-uri:** OPI + toți ceilalți 11 KPI + HabitEngine, MissionEngine, PriorityEngine, FollowUpEngine
 - **Formula:** va fi definită în KPI-MODEL-001
 - **Status:** PROPOSED
 
@@ -152,15 +154,7 @@ Formulele matematice și algoritmii concreți sunt definiți ulterior în **KPI-
 - **Formula:** va fi definită în KPI-MODEL-001
 - **Status:** PROPOSED
 
-### KPI-013 — AMS (Autonomy Maturity Score)
-- **Categorie:** Autonomy / Strategic Maturity
-- **Scop:** Măsoară gradul de autonomie operațională al utilizatorului, rezultat din integrarea tuturor KPI-urilor Motorului 1 și din capacitatea de a produce rezultate constante, de a dezvolta relații, parteneri și lideri folosind NicMar OS ca sistem de ghidare.
-- **Sursă:** Competența 37 (`Autonomia_Completă_a_Utilizatorului`, ultima din Motorul 1), motor `AutonomyEngine`
-- **Input-uri:** OPI + toți ceilalți 11 KPI + HabitEngine, MissionEngine, PriorityEngine, FollowUpEngine
-- **Formula:** va fi definită în KPI-MODEL-001
-- **Status:** PROPOSED
-
-### KPI-014 — OPI (Overall Performance Index)
+### KPI-013 — OPI (Overall Performance Index)
 - **Categorie:** Overall Performance (indicator strategic compozit)
 - **Scop:** Măsoară performanța generală prin agregarea celorlalți 12 KPI operaționali ai sistemului.
 - **Entități:** User (principal); Partner, Team, Leader (secundare)
