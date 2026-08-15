@@ -207,7 +207,7 @@ class MissionEngine:
         """
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id FROM kpis WHERE metric_code = 'DIS'")
+                cur.execute("SELECT id FROM kpis WHERE metric_code = %s", ("DIS",))
                 row = cur.fetchone()
                 if row is None:
                     raise RuntimeError(
