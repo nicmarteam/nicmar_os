@@ -1,4 +1,4 @@
-# MVP-AGENT-001 — Arhitectura celor 4 Agenți MVP
+# MVP-AGENT-001 — Arhitectura celor 5 Agenți MVP
 
 **Status:** DRAFT VALIDAT — cele 4 puncte deschise confirmate de owner (v. secțiunea 4)
 **Depinde de:** `06-harta-motoare-tehnice.md` (6 motoare MVP), `04-KPI-REG-001.md` (13 KPI)
@@ -53,6 +53,18 @@ Documentul de 37 de competențe arată un tipar consecvent, repetat de 49 de ori
 - **Output:** un singur pas concret, executabil azi (aliniat cu "Legea Primului Pas" din sursă — un singur pas, nu o listă lungă)
 - **Human-in-the-loop:** buton unic de confirmare ("Sunt gata, încep"), aliniat exact cu tiparul din Competența 12
 
+### Agent 5 — Partner Agent (adăugat — audit P11, 12 august 2026)
+- **Sursă:** Competența 27 (`Comunicarea_cu_Partenerii`), documentată ecran-cu-ecran, verificată direct din `05-competente-37-motor1.md`
+- **Motor sursă:** `PartnerRelationshipEngine` — State Owner confirmat pentru Partner (`02-business-objects-5-pillars.md`, linia 909)
+- **Priority capability (MVP, la nivel de Agent, nu `PriorityEngine` complet):** selectează partenerul cu scorul de nevoie cel mai ridicat, calculat direct din datele deja disponibile în MVP (`PDI`, timp de la ultima interacțiune, din `partners`/`state_history`), fără logica de optimizare globală/transversală a motorului complet `PriorityEngine` (rămas post-MVP, v. `06-harta-motoare-tehnice.md`)
+- **Input:** ultima activitate, ultima conversație, Misiunea Zilei, progresul în cele 37 competențe, Indicele de Continuitate, nivelul de energie, blocaje active
+- **KPI relevanți:** PDI, PIP
+- **Output:** 2 straturi, nu unul —
+  1. **diagnostic calitativ**: "are nevoie de încurajare" / "claritate" / "apreciere" / "pasul următor"
+  2. **mesaj generat automat**, gata de trimis, bazat pe istoric + identitate + tonul NicMar
+- **Human-in-the-loop:** dublu — liderul alege direcția emoțională dorită pentru partener, apoi confirmă autenticitatea mesajului generat ("Exact" / "Ajustăm" / "Construim altul") înainte de trimitere pe canalul ales
+- **Notă de graniță:** distinct de Contact Agent (Client rămâne absorbit acolo — output tot de tip listă, fără asimetrie de formă). Doar Partner are output calitativ, nu doar prioritizare.
+
 ---
 
 ## 3. Stratul comun — RuleEngine
@@ -73,7 +85,7 @@ Event → Engine → Rule → Data → Agent → Human → Action
 
 2. **Ordinea de construcție — confirmată.** Contact Agent → Conversation Agent → FollowUp Agent → Mission Agent, ca prim vertical slice complet funcțional, conform planului din auditul de execuție inițial.
 
-3. **Numărul de agenți — 4 pentru MVP, explicit provizoriu.** Owner-ul confirmă: *"acum 4 agenți, dar vor fi mult mai mulți agenți"*. Cei 4 nu sunt o limită arhitecturală, ci punctul de plecare al vertical slice-ului MVP. Extinderea ulterioară e așteptată, nu excepțională — probabil unul per motor din cele 13 rămase post-MVP (`07-motoare-post-mvp.md`), pe măsură ce fiecare motor intră în scope.
+3. **Numărul de agenți — 5 pentru MVP (actualizat, audit P11), explicit provizoriu.** Owner-ul confirmă inițial: *"acum 4 agenți, dar vor fi mult mai mulți agenți"*. Auditul P11 a adăugat **Partner Agent** ca al 5-lea, pe bază de dovadă (output calitativ proiectat în `05`, imposibil de acoperit generic prin Contact Agent) — nu prin extindere arbitrară. Cei 5 rămân punctul de plecare al vertical slice-ului MVP, nu o limită arhitecturală.
 
 ---
 
