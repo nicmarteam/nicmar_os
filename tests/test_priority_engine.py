@@ -125,9 +125,8 @@ class TestBuildPriorityList:
         now = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
         mission_id = uuid4()
         followup_id = uuid4()
-        contact_id = uuid4()
 
-        now_conn = make_conn(fetchone=now)
+        now_conn = make_conn(fetchone=(now,))
         mission_conn = make_conn(
             fetchall=[(mission_id, "Mission test", now - timedelta(hours=1))]
         )
@@ -169,7 +168,7 @@ class TestBuildPriorityList:
 
     def test_empty_owner_returns_empty_list(self):
         owner_id = uuid4()
-        now_conn = make_conn(fetchone=datetime.now(UTC))
+        now_conn = make_conn(fetchone=(datetime.now(UTC),))
         mission_conn = make_conn(fetchall=[])
         followup_conn = make_conn(fetchall=[])
 
@@ -186,7 +185,7 @@ class TestBuildPriorityList:
         followup_id = uuid4()
         now = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
 
-        now_conn = make_conn(fetchone=now)
+        now_conn = make_conn(fetchone=(now,))
         mission_conn = make_conn(fetchall=[])
         followup_conn = make_conn(
             fetchall=[
