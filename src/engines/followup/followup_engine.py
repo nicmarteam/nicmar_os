@@ -73,6 +73,16 @@ class InvalidTransitionError(Exception):
     """Ridicată la o tranziție de stare neconformă cu _ALLOWED_TRANSITIONS."""
 
 
+class FollowUpAccessDeniedError(Exception):
+    """
+    Ridicată dacă followup_id nu există SAU nu aparține owner_id-ului dat.
+
+    Mesaj identic pentru ambele cazuri — previne enumerare de ID-uri.
+    Descoperit prin Security Isolation Audit (12 august 2026), aceeași
+    categorie de gaură ca la MissionEngine.
+    """
+
+
 class HumanConfirmationRequiredError(Exception):
     """Ridicată dacă se încearcă finalizarea unui follow-up fără confirmare umană explicită."""
 
@@ -147,19 +157,28 @@ class FollowUpEngine:
     # Tranziții — o singură cale de scriere a stării
     # ------------------------------------------------------------------
 
-    def _set_status(self, followup_id: UUID, new_status: str) -> FollowUp:
+    def _set_status(self, followup_id: UUID, owner_id: UUID, new_status: str) -> FollowUp:
         """
         SINGURA metodă din tot fișierul care scrie `follow_ups.status`.
+
+        `owner_id` OBLIGATORIU și verificat — la fel ca la MissionEngine
+        (Security Isolation Audit, 12 august 2026). Fără el, oricine
+        cunoștea un followup_id putea schimba starea oricărui follow-up.
         """
         if new_status not in VALID_STATUSES:
             raise InvalidTransitionError(f"Stare necunoscută: {new_status}")
 
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT status FROM follow_ups WHERE id = %s", (followup_id,))
+                cur.execute(
+                    "SELECT status FROM follow_ups WHERE id = %s AND owner_id = %s",
+                    (followup_id, owner_id),
+                )
                 row = cur.fetchone()
                 if row is None:
-                    raise InvalidTransitionError(f"FollowUp {followup_id} nu există.")
+                    raise FollowUpAccessDeniedError(
+                        f"FollowUp {followup_id} nu există sau nu aparține acestui owner."
+                    )
                 current_status = row[0]
 
                 if new_status not in _ALLOWED_TRANSITIONS.get(current_status, set()):
@@ -169,8 +188,9 @@ class FollowUpEngine:
 
                 cur.execute(
                     "UPDATE follow_ups SET status = %s, updated_at = clock_timestamp() "
-                    "WHERE id = %s RETURNING id, owner_id, contact_id, conversation_id, status",
-                    (new_status, followup_id),
+                    "WHERE id = %s AND owner_id = %s "
+                    "RETURNING id, owner_id, contact_id, conversation_id, status",
+                    (new_status, followup_id, owner_id),
                 )
                 row = cur.fetchone()
 
@@ -189,7 +209,7 @@ class FollowUpEngine:
         self._emit_event(_EVENT_FOR_STATUS[new_status], followup_id, {"new_status": new_status})
         return followup
 
-    def complete_followup(self, followup_id: UUID, confirmed: bool) -> FollowUp:
+    def complete_followup(self, followup_id: UUID, owner_id: UUID, confirmed: bool) -> FollowUp:
         """
         PENDING -> COMPLETED.
 
@@ -201,15 +221,15 @@ class FollowUpEngine:
             raise HumanConfirmationRequiredError(
                 "FollowUpCompleted necesită confirmare umană explicită (confirmed=True)."
             )
-        return self._set_status(followup_id, "COMPLETED")
+        return self._set_status(followup_id, owner_id, "COMPLETED")
 
-    def postpone_followup(self, followup_id: UUID) -> FollowUp:
+    def postpone_followup(self, followup_id: UUID, owner_id: UUID) -> FollowUp:
         """PENDING -> POSTPONED. Alegerea liderului ('Amână') e ea însăși acțiunea."""
-        return self._set_status(followup_id, "POSTPONED")
+        return self._set_status(followup_id, owner_id, "POSTPONED")
 
-    def reschedule_followup(self, followup_id: UUID) -> FollowUp:
+    def reschedule_followup(self, followup_id: UUID, owner_id: UUID) -> FollowUp:
         """PENDING -> RESCHEDULED."""
-        return self._set_status(followup_id, "RESCHEDULED")
+        return self._set_status(followup_id, owner_id, "RESCHEDULED")
 
     # ------------------------------------------------------------------
     # KPI — DIS, persistat la creare (nu la finalizare — vezi docstring modul)
