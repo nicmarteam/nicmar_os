@@ -58,6 +58,8 @@ Necesită `state_history` pentru `Contact` (nu există azi — `Contact` are doa
 
 ## 3. Timp v1 — ✅ DECIS, confirmat explicit
 
+**Rol: retrospectiv, pentru `DIS`/analiză — NU e input live pentru `PriorityScore`** (v. secțiunea 3bis pentru distincția de `Vechime`).
+
 ```
 Mission:   state_history(new_state='COMPLETED').created_at − missions.created_at
 FollowUp:  state_history(new_state='COMPLETED').created_at − follow_ups.created_at
@@ -66,6 +68,24 @@ Partner:   events('PartnerInteractionCompleted').created_at
 ```
 
 Toate 3 derivate din timestamp-uri deja scrise de codul existent — fără câmpuri noi, fără presupuneri. **Confirmat explicit de Nic.**
+
+**Limitare structurală, descoperită la definirea formulei agregate:** `Timp` se calculează *doar după* `COMPLETED` — inutilizabil ca input pentru `PriorityScore`, care trebuie să decidă prioritatea printre activități **încă neterminate** (`PENDING`/`IN_PROGRESS`), care n-au încă timestamp de finalizare. De aici, secțiunea următoare.
+
+---
+
+## 3bis. Vechime v1 — ✅ DECIS, concept nou, distinct de Timp
+
+**Rol: live, input real pentru `PriorityScore`** — răspunde la *"de cât timp așteaptă asta, acum"*, nu *"cât a durat, retrospectiv"*.
+
+```
+Vechime = ACUM − created_at   (pentru orice activitate încă deschisă)
+
+Mission:   ACUM − missions.created_at
+FollowUp:  ACUM − follow_ups.created_at
+Partner:   ACUM − events('PartnerDiagnosticGenerated').created_at
+```
+
+**`Timp` și `Vechime` NU sunt același concept, deși folosesc surse de date similare** — `Timp` măsoară un interval încheiat (finalizare − creare), `Vechime` măsoară un interval deschis (acum − creare), recalculat continuu. Nu se substituie unul pe altul.
 
 ---
 
@@ -88,15 +108,19 @@ Flux: Impact + Timp + Urgență → PriorityScore → sortare → filtru Încăr
 
 ---
 
-## 5. Urgență v1 — DECIS parțial, praguri **TBD explicit**
+## 5. Urgență v1 — ✅ DECIS complet, praguri confirmate
 
 ```
 UrgențăBase = 1.0   (Mission, Partner — fără date reale de urgență în v1)
 
-UrgențăFollowUp = derivat din follow_ups.scheduled_at, comparat cu "acum":
-    TBD — pragurile exacte (ce înseamnă "depășit", "azi", "apropiat", "îndepărtat",
-    în unități de timp concrete) NU sunt decise. Nu se inventează acum.
+UrgențăFollowUp, din follow_ups.scheduled_at comparat cu "acum":
+    Îndepărtat (≥3 zile în viitor)  → 1.00
+    Apropiat (+1-2 zile)            → 1.33
+    Azi (ziua curentă)              → 1.67
+    Depășit (orice moment trecut)   → 2.00   (plat — 10 minute sau 3 zile depășite = aceeași valoare)
 ```
+
+**Confirmat explicit de Nic.** Durata exactă a întârzierii rămâne disponibilă separat, prin `Vechime` (secțiunea 3bis) — nu se introduce o a doua scală de Urgență pentru asta.
 
 ### De ce Mission/Partner rămân la valoare de bază
 Aceeași asimetrie găsită la Impact: `missions.scheduled_at` există în schemă, dar **nu e niciodată setat** de `generate_mission()` — verificat în cod, rămâne mereu `NULL`. `Partner` n-are echivalent de `scheduled_at` deloc.
@@ -105,13 +129,15 @@ Aceeași asimetrie găsită la Impact: `missions.scheduled_at` există în schem
 
 ## 6. Formula agregată — **TBD, nedecisă**
 
-**Doar 3 componente intră în `PriorityScore`** — Încărcarea e deja decisă ca filtru post-scoring (secțiunea 4), nu componentă de scor.
+**3 componente intră în `PriorityScore`, dar `Timp` NU e una dintre ele** — corectură conceptuală (secțiunea 3bis): `Timp` e retrospectiv (necesită `COMPLETED`), inutilizabil pentru activități încă deschise. Componenta live corectă e `Vechime`.
 
 ```
-PriorityScore = f(Impact, Timp, Urgență)
+PriorityScore = f(Impact, Vechime, Urgență)
 ```
 
-Modul exact de combinare **nu a fost stabilit azi**: Sumă ponderată? Produs? Ordine lexicografică (Impact primul, Timp ca tiebreaker)?
+Încărcarea rămâne filtru post-scoring (secțiunea 4), nu intră aici.
+
+Modul exact de combinare **nu a fost stabilit azi**: Sumă ponderată? Produs? Ordine lexicografică (Impact primul, Vechime ca tiebreaker)?
 
 **Nu se inventează această formulă acum** — rămâne următoarea decizie de business, separată.
 
@@ -124,11 +150,12 @@ Modul exact de combinare **nu a fost stabilit azi**: Sumă ponderată? Produs? O
 | Impact — Layer 1 (tip) | ✅ | — |
 | Impact — Layer 2 (context, doar FollowUp) | ✅ | — |
 | Impact — Layer 3 (progres real relație) | ❌ | ✅ (necesită `state_history` pentru Contact) |
-| Timp | ✅ decis, confirmat | — |
+| Timp (retrospectiv, pentru DIS) | ✅ decis, confirmat | — |
+| **Vechime** (live, pentru `PriorityScore`) | ✅ decis, confirmat | — |
 | Încărcare (formulă) | ✅ | — |
 | Încărcare (rol în agregare) | ✅ filtru post-scoring | — |
 | Urgență (concept + sursă date) | ✅ (doar FollowUp) | — |
-| Urgență (praguri numerice) | ❌ TBD | — |
+| Urgență (praguri numerice) | ✅ decis, confirmat | — |
 | Urgență pentru Mission/Partner | ❌ (valoare de bază) | ✅ (necesită `scheduled_at` populat real) |
 | Formula agregată finală | ❌ TBD | — |
 | `HabitEngine`, `Calendar`, `Dashboard` ca intrări | ❌ | post-MVP, nedatat |
@@ -139,7 +166,8 @@ Modul exact de combinare **nu a fost stabilit azi**: Sumă ponderată? Produs? O
 
 1. **Mission e sistematic dezavantajat** față de FollowUp în Impact și Urgență, nu din decizie de business, ci din lipsă de date (`contact_id`, `scheduled_at` nesetate) — risc real de a subprioritiza Mission-uri, dacă formula agregată nu compensează
 2. **`CONVERTED = 0.0` bonus** poate fi interpretat greșit ca "valoare mică" dacă nu e documentat clar în UI/Dashboard — necesită atenție la implementare
-3. **Urgența are pragurile numerice TBD. Încărcarea este decisă complet ca filtru post-scoring** — nu mai e un TBD, nu se redeschide.
+3. **`Timp` și `Vechime` sunt concepte distincte, deși similare ca sursă de date** — orice implementare viitoare trebuie să respecte separarea (secțiunea 3bis), nu le trateze ca interschimbabile
+4. **Singura decizie rămasă: formula agregată** `PriorityScore = f(Impact, Vechime, Urgență)` — restul componentelor sunt închise
 
 ---
 
@@ -148,22 +176,26 @@ Modul exact de combinare **nu a fost stabilit azi**: Sumă ponderată? Produs? O
 - [ ] Impact: Mission → mereu `1.0`, indiferent de context
 - [ ] Impact: Partner → mereu `2.0`
 - [ ] Impact: FollowUp × 4 contexte → `1.0`/`1.5`/`2.0`/`1.0` (ARCHIVED/NEW/ACTIVE/CONVERTED)
-- [ ] Timp: calculat corect din `state_history`, pentru toate 3 tipuri
-- [ ] Timp: gestionare corectă dacă entitatea nu e încă `COMPLETED` (fără eroare, valoare `None`/`TBD`)
+- [ ] Timp: calculat corect din `state_history`, pentru toate 3 tipuri (doar entități `COMPLETED`)
+- [ ] Timp: **nu se calculează** pentru entități încă deschise — folosesc `Vechime`, nu `Timp`, în acel caz
+- [ ] Vechime: calculat corect (`ACUM − created_at`), pentru toate 3 tipuri, doar pe entități încă deschise
+- [ ] Urgență FollowUp × 4 praguri → `1.00`/`1.33`/`1.67`/`2.00` (Îndepărtat/Apropiat/Azi/Depășit)
+- [ ] Urgență: un FollowUp depășit cu 10 minute și unul depășit cu 3 zile → **aceeași valoare** (`2.00`, plat, confirmat)
+- [ ] Urgență: Mission/Partner → mereu `1.0`
 - [ ] Încărcare: numărătoare corectă, izolată per `owner_id` (verificare de securitate, ca la toate celelalte azi)
 - [ ] `PriorityScore` **nu folosește Încărcarea** — verificat explicit, nu presupus
+- [ ] `PriorityScore` **nu folosește `Timp`** (retrospectiv) — folosește `Vechime` (live) — verificat explicit
 - [ ] Modificarea numărului de activități active **nu modifică scorul individual** al unei activități
 - [ ] Încărcarea afectează doar **numărul de activități selectate în Planul Zilei**, nu ordinea/scorul lor
-- [ ] Urgență: Mission/Partner → mereu `1.0`
 - [ ] Test de regresie: cele 115+ teste existente rămân verzi
 
 ---
 
 ## 10. Următorul pas real
 
-**Nu cod încă.** Rămân **2** decizii de business explicite, separate, înainte de implementare (Încărcarea e închisă, nu se redeschide):
-1. Pragurile numerice pentru Urgență (FollowUp)
-2. Formula agregată finală — cum se combină `Impact + Timp + Urgență` într-un `PriorityScore`
+**Nu cod încă.** Rămâne **o singură** decizie de business explicită, înainte de implementare (Impact, Timp, Vechime, Încărcare, Urgență — toate închise, niciuna nu se redeschide):
+
+**Formula agregată finală** — cum se combină `Impact + Vechime + Urgență` într-un `PriorityScore`.
 
 ---
-*Document canonic. Fiecare valoare din secțiunile 2-3 e verificată din cod/schemă reală. Fiecare TBD e marcat explicit, nu completat cu presupuneri.*
+*Document canonic. Fiecare valoare din secțiunile 2-3bis, 5 e verificată din cod/schemă reală sau confirmată explicit de Nic. Singurul TBD rămas e marcat explicit, nu completat cu presupuneri.*
