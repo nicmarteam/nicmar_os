@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_mission_agent, get_mission_engine
 from src.api.schemas import (
-    CreateMissionRequest, MissionResponse, StartMissionRequest,
+    CreateMissionRequest, AssignMissionRequest, MissionResponse, StartMissionRequest,
     CompleteMissionRequest, PresentMissionResponse, DisScoreResponse,
 )
 from src.agents.mission.mission_agent import MissionAgent
@@ -39,6 +39,24 @@ def create_mission(
 ):
     """Generează o misiune nouă — apelează MissionEngine direct (fără metodă Agent de generare)."""
     mission = mission_engine.generate_mission(body.owner_id, body.title)
+    return _to_response(mission)
+
+
+@router.post("/{mission_id}/assign", response_model=MissionResponse)
+def assign_mission(
+    mission_id: UUID,
+    body: AssignMissionRequest,
+    mission_engine: MissionEngine = Depends(get_mission_engine),
+):
+    """
+    GENERATED -> ASSIGNED. Apelează MissionEngine direct — nu există
+    metodă Agent pentru assign (verificat: MissionAgent nu are
+    assign_mission, doar confirm_and_start/confirm_completion).
+    Nu necesită confirmed — GENERATED -> ASSIGNED nu e punct de HITL
+    (verificat în docstring-ul metodei: "fără confirmare umană
+    necesară aici, afișare în Dashboard").
+    """
+    mission = mission_engine.assign_mission(mission_id, body.owner_id)
     return _to_response(mission)
 
 
