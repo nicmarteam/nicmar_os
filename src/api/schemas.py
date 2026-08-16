@@ -12,12 +12,7 @@ from pydantic import BaseModel
 
 
 class CreateMissionRequest(BaseModel):
-    owner_id: UUID
     title: str
-
-
-class AssignMissionRequest(BaseModel):
-    owner_id: UUID
 
 
 class MissionResponse(BaseModel):
@@ -28,12 +23,7 @@ class MissionResponse(BaseModel):
 
 
 class StartMissionRequest(BaseModel):
-    owner_id: UUID
     confirmed: bool
-
-
-class CompleteMissionRequest(BaseModel):
-    owner_id: UUID
 
 
 class PresentMissionResponse(BaseModel):
