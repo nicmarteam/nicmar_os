@@ -1,0 +1,56 @@
+name: Tests
+
+# Ruleaza la fiecare push si la fiecare Pull Request — exact ordinea
+# stabilita: install dependencies -> PostgreSQL real -> migration ->
+# seed -> pytest (unitare + integrare + securitate + PostgreSQL real).
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: nicmar_test
+          POSTGRES_DB: nicmar_os_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:nicmar_test@localhost:5432/nicmar_os_ci
+
+    steps:
+      - name: Checkout cod
+        uses: actions/checkout@v4
+
+      - name: Instalare Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalare client PostgreSQL (pentru rularea migrațiilor)
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Instalare dependențe proiect
+        run: pip install -e ".[dev]"
+
+      - name: Rulare migrație — 16 tabele
+        run: psql "$DATABASE_URL" -f migrations/001_initial_schema.sql
+
+      - name: Rulare seed minim — 13 KPI, 3 reguli, 1 utilizator
+        run: psql "$DATABASE_URL" -f migrations/002_seed_minimal.sql
+
+      - name: Rulare pytest — unitare + integrare + securitate + PostgreSQL real
+        run: pytest -v
