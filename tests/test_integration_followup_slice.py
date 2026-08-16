@@ -36,15 +36,21 @@ class FakeDB:
             self._last_result = (fid, owner_id, contact_id, conversation_id, "PENDING")
 
         elif q.startswith("SELECT status FROM follow_ups"):
-            (fid,) = params
+            fid, owner_id = params
             f = self.follow_ups.get(fid)
-            self._last_result = (f["status"],) if f else None
+            if f and f["owner_id"] == owner_id:
+                self._last_result = (f["status"],)
+            else:
+                self._last_result = None
 
         elif q.startswith("UPDATE follow_ups SET status"):
-            new_status, fid = params
-            f = self.follow_ups[fid]
-            f["status"] = new_status
-            self._last_result = (fid, f["owner_id"], f["contact_id"], f["conversation_id"], new_status)
+            new_status, fid, owner_id = params
+            f = self.follow_ups.get(fid)
+            if f and f["owner_id"] == owner_id:
+                f["status"] = new_status
+                self._last_result = (fid, f["owner_id"], f["contact_id"], f["conversation_id"], new_status)
+            else:
+                self._last_result = None
 
         elif q.startswith("INSERT INTO state_history"):
             self.state_history.append(params)
@@ -138,14 +144,14 @@ with patch("src.engines.rule.rule_engine.get_connection") as rule_conn, \
 
     print("=== PASUL 5: Fara confirmare, refuz garantat (prin Agent) ===")
     try:
-        agent.confirm_completion(followup.id, confirmed=False)
+        agent.confirm_completion(followup.id, owner_id, confirmed=False)
         print("EROARE: ar fi trebuit sa refuze")
     except Exception as e:
         print("OK: refuzat —", type(e).__name__)
     print()
 
     print("=== PASUL 6: Liderul confirma finalizarea — via Agent ===")
-    followup = agent.confirm_completion(followup.id, confirmed=True)
+    followup = agent.confirm_completion(followup.id, owner_id, confirmed=True)
     print("Status:", followup.status)
     assert followup.status == "COMPLETED"
     assert fake_db.follow_ups[followup.id]["status"] == "COMPLETED"
