@@ -46,11 +46,14 @@ jobs:
       - name: Instalare dependențe proiect
         run: pip install -e ".[dev]"
 
-      - name: Rulare migrație — 16 tabele
+      - name: Rulare migrație — schema inițială
         run: psql "$DATABASE_URL" -f migrations/001_initial_schema.sql
 
       - name: Rulare seed minim — 13 KPI, 3 reguli, 1 utilizator
         run: psql "$DATABASE_URL" -f migrations/002_seed_minimal.sql
+
+      - name: Rulare migrație — credențiale Auth
+        run: psql "$DATABASE_URL" -f migrations/003_auth_credentials.sql
 
       - name: Rulare pytest — unitare + integrare + securitate + PostgreSQL real
         run: pytest -v
