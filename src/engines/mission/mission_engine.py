@@ -196,6 +196,27 @@ class MissionEngine:
         self._emit_event(_EVENT_FOR_STATUS[new_status], mission_id, {"new_status": new_status})
         return mission
 
+    def get_mission(self, mission_id: UUID, owner_id: UUID) -> Mission:
+        """
+        Citește o misiune (READ-ONLY), necesară pentru API (endpoint
+        /present, care are nevoie de obiectul Mission complet, nu doar
+        de ID). Verifică owner_id la fel ca la scriere — nu dezvăluim
+        existența unei misiuni a altui owner nici la citire.
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, owner_id, title, status FROM missions "
+                    "WHERE id = %s AND owner_id = %s",
+                    (mission_id, owner_id),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    raise MissionAccessDeniedError(
+                        f"Mission {mission_id} nu există sau nu aparține acestui owner."
+                    )
+        return Mission(id=row[0], owner_id=row[1], title=row[2], status=row[3])
+
     def assign_mission(self, mission_id: UUID, owner_id: UUID) -> Mission:
         """GENERATED -> ASSIGNED. Fără confirmare umană necesară aici (afișare în Dashboard)."""
         return self._set_status(mission_id, owner_id, "ASSIGNED")
