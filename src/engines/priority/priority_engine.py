@@ -10,15 +10,12 @@ activitățile în ordine lexicografică. Nu scrie în DB.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from datetime import datetime, timedelta
+from typing import List, Tuple
 from uuid import UUID
 
 from src.data.db import get_connection
 
-
-ACTIVE_MISSION_STATUSES = ("GENERATED", "ASSIGNED", "IN_PROGRESS")
-ACTIVE_FOLLOWUP_STATUS = "PENDING"
 
 IMPACT_MISSION = 1.0
 IMPACT_FOLLOWUP_BASE = 1.0
@@ -168,7 +165,7 @@ class PriorityEngine:
         urgency: float,
         now: datetime,
     ) -> PrioritizedActivity:
-        vechime_seconds = max(0.0, (now - created_at).total_seconds())
+        vechime_seconds = (now - created_at).total_seconds()
         priority_key = (impact, urgency, vechime_seconds)
         return PrioritizedActivity(
             entity_type=entity_type,
