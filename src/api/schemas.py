@@ -50,6 +50,20 @@ class ErrorResponse(BaseModel):
 
 
 # ------------------------------------------------------------------
+# Auth
+# ------------------------------------------------------------------
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+# ------------------------------------------------------------------
 # FollowUp — sursă: 15-followup-api-contract.md
 # ------------------------------------------------------------------
 
