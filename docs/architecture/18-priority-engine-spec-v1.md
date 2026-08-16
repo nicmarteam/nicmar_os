@@ -56,7 +56,7 @@ Necesită `state_history` pentru `Contact` (nu există azi — `Contact` are doa
 
 ---
 
-## 3. Timp v1 — ⚠️ PROPUS, necesită confirmare explicită
+## 3. Timp v1 — ✅ DECIS, confirmat explicit
 
 ```
 Mission:   state_history(new_state='COMPLETED').created_at − missions.created_at
@@ -65,7 +65,7 @@ Partner:   events('PartnerInteractionCompleted').created_at
            − events('PartnerDiagnosticGenerated').created_at
 ```
 
-Toate 3 derivate din timestamp-uri deja scrise de codul existent — fără câmpuri noi, fără presupuneri. **Definiția e propusă de Claude, nu confirmată explicit de Nic** — rămâne deschisă până la confirmare, aceeași disciplină aplicată la Impact/Încărcare.
+Toate 3 derivate din timestamp-uri deja scrise de codul existent — fără câmpuri noi, fără presupuneri. **Confirmat explicit de Nic.**
 
 ---
 
@@ -120,7 +120,7 @@ Cele 4 componente (Impact, Timp, Încărcare, Urgență) au fost definite **indi
 | Impact — Layer 1 (tip) | ✅ | — |
 | Impact — Layer 2 (context, doar FollowUp) | ✅ | — |
 | Impact — Layer 3 (progres real relație) | ❌ | ✅ (necesită `state_history` pentru Contact) |
-| Timp | ⚠️ propus, neconfirmat | — |
+| Timp | ✅ decis, confirmat | — |
 | Încărcare (formulă) | ✅ | — |
 | Încărcare (rol în agregare) | ✅ filtru post-scoring | — |
 | Urgență (concept + sursă date) | ✅ (doar FollowUp) | — |
