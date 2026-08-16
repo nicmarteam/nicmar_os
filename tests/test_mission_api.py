@@ -137,3 +137,94 @@ def test_dis_score_endpoint_readonly(client):
     response = client.get("/api/v1/missions/dis-score", params={"owner_id": owner_id})
     assert response.status_code == 200
     assert response.json()["dis_score"] is None
+
+
+def test_assign_mission_success(client):
+    """POST /assign: GENERATED -> ASSIGNED, cu owner corect."""
+    owner_id = _create_user("assign-ok")
+    create_resp = client.post("/api/v1/missions", json={"owner_id": owner_id, "title": "Test assign"})
+    mission_id = create_resp.json()["id"]
+
+    response = client.post(f"/api/v1/missions/{mission_id}/assign", json={"owner_id": owner_id})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ASSIGNED"
+
+
+def test_assign_mission_wrong_owner_returns_403(client):
+    """POST /assign, alt owner -> 403 ACCESS_DENIED."""
+    owner_id = _create_user("assign-owner")
+    other_owner_id = str(uuid4())
+    create_resp = client.post("/api/v1/missions", json={"owner_id": owner_id, "title": "Confidential"})
+    mission_id = create_resp.json()["id"]
+
+    response = client.post(f"/api/v1/missions/{mission_id}/assign", json={"owner_id": other_owner_id})
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "ACCESS_DENIED"
+
+
+def test_assign_mission_nonexistent_id_returns_403(client):
+    """
+    POST /assign, ID inexistent -> 403 ACCESS_DENIED (nu 404).
+
+    Comportament contractual confirmat: MissionAccessDeniedError
+    foloseste acelasi mesaj/cod pentru "nu exista" si "nu e al tau" —
+    previne enumerarea de ID-uri (v. docstring MissionAccessDeniedError).
+    """
+    owner_id = _create_user("assign-nonexistent")
+    fake_mission_id = uuid4()
+
+    response = client.post(f"/api/v1/missions/{fake_mission_id}/assign", json={"owner_id": owner_id})
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "ACCESS_DENIED"
+
+
+def test_assign_mission_invalid_transition_returns_400(client):
+    """POST /assign de doua ori pe rand -> a doua oara, ASSIGNED->ASSIGNED e invalid."""
+    owner_id = _create_user("assign-twice")
+    create_resp = client.post("/api/v1/missions", json={"owner_id": owner_id, "title": "Test"})
+    mission_id = create_resp.json()["id"]
+
+    first = client.post(f"/api/v1/missions/{mission_id}/assign", json={"owner_id": owner_id})
+    assert first.status_code == 200
+
+    second = client.post(f"/api/v1/missions/{mission_id}/assign", json={"owner_id": owner_id})
+    assert second.status_code == 400
+    assert second.json()["error_code"] == "INVALID_TRANSITION"
+
+
+def test_full_http_flow_generate_to_complete(client):
+    """
+    Fluxul HTTP complet: generate -> assign -> present -> start -> complete -> DIS.
+
+    Acesta e testul decisiv — dovedeste ca Mission API e complet
+    functional cap-coada, nu doar endpoint cu endpoint izolat.
+    """
+    owner_id = _create_user("full-flow")
+
+    r1 = client.post("/api/v1/missions", json={"owner_id": owner_id, "title": "Sună clientul"})
+    assert r1.status_code == 201
+    mission_id = r1.json()["id"]
+    assert r1.json()["status"] == "GENERATED"
+
+    r2 = client.post(f"/api/v1/missions/{mission_id}/assign", json={"owner_id": owner_id})
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "ASSIGNED"
+
+    r3 = client.get(f"/api/v1/missions/{mission_id}/present", params={"owner_id": owner_id})
+    assert r3.status_code == 200
+    assert "Sună clientul" in r3.json()["text"]
+
+    r4 = client.post(
+        f"/api/v1/missions/{mission_id}/start",
+        json={"owner_id": owner_id, "confirmed": True},
+    )
+    assert r4.status_code == 200
+    assert r4.json()["status"] == "IN_PROGRESS"
+
+    r5 = client.post(f"/api/v1/missions/{mission_id}/complete", json={"owner_id": owner_id})
+    assert r5.status_code == 200
+    assert r5.json()["status"] == "COMPLETED"
+
+    r6 = client.get("/api/v1/missions/dis-score", params={"owner_id": owner_id})
+    assert r6.status_code == 200
+    assert r6.json()["dis_score"] == 1.0
