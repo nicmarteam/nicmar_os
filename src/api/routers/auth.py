@@ -5,7 +5,7 @@ Singurul endpoint din acest slice. get_current_user() (folosit de
 celelalte routere) e o dependency, nu un endpoint propriu.
 """
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request
 
 from src.api.schemas import LoginRequest, TokenResponse
 from src.auth.rate_limit import login_rate_limiter
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, request: Request, response: Response):
+def login(body: LoginRequest, request: Request):
     """
     Verifică email+parolă, returnează access token JWT.
 
@@ -30,10 +30,10 @@ def login(body: LoginRequest, request: Request, response: Response):
     client_ip = request.client.host if request.client else "unknown"
 
     if login_rate_limiter.is_limited(client_ip):
-        response.headers["Retry-After"] = str(login_rate_limiter.retry_after(client_ip))
         raise HTTPException(
             status_code=429,
             detail="Prea multe încercări de autentificare. Încearcă din nou mai târziu.",
+            headers={"Retry-After": str(login_rate_limiter.retry_after(client_ip))},
         )
 
     try:
