@@ -27,7 +27,11 @@ class FakeDB:
         q = " ".join(query.split())
         params = params or ()
 
-        if q.startswith("SELECT COUNT(*) FROM events"):
+        if q.startswith("SELECT 1 FROM partners"):
+            pid, oid = params
+            self._last_result = (1,) if self.partners.get(pid) == oid else None
+
+        elif q.startswith("SELECT COUNT(*) FROM events"):
             (partner_id,) = params
             count = sum(
                 1 for e in self.events
