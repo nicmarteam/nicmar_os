@@ -1,17 +1,20 @@
 """
-Test de integrare — Mission Vertical Slice, cap-coada.
+Test de integrare — Mission Vertical Slice, cap-coada, ca teste pytest reale.
 
-Nu foloseste PostgreSQL real. Foloseste o baza de date falsa, in memorie,
-care tine stare reala intre apeluri (spre deosebire de mock-urile
-individuale de dinainte) - simuleaza fidel comportamentul SQL folosit
-de RuleEngine, MissionEngine si MissionAgent.
+Foloseste o clasa (TestMissionVerticalSlice) cu stare partajata intre
+pasi (self.mission, self.fake_db etc.) — pytest ruleaza metodele unei
+clase in ordinea definirii lor, ceea ce pastreaza exact fluxul original
+(fiecare pas depinde de rezultatul celui anterior), dar fiecare pas
+apare acum separat, cu nume, in raportul pytest.
+
+Nu foloseste PostgreSQL real — FakeDB in memorie, cu stare reala intre
+apeluri (simuleaza fidel comportamentul SQL).
 """
-import sys
-sys.path.insert(0, '/home/claude/nicmar_impl')
 
 from unittest.mock import MagicMock, patch
-from uuid import uuid4, UUID
-from datetime import datetime, timezone
+from uuid import uuid4
+
+import pytest
 
 from src.engines.rule.rule_engine import RuleEngine
 from src.engines.mission.mission_engine import MissionEngine
@@ -22,17 +25,15 @@ class FakeDB:
     """Baza de date falsa, in memorie, cu stare reala intre apeluri."""
 
     def __init__(self):
-        self.missions = {}       # id -> dict(owner_id, title, status)
-        self.kpis = {}           # metric_code -> id
-        self.scores = []         # lista de (kpi_id, entity_type, entity_id, score_value)
+        self.missions = {}
+        self.kpis = {}
+        self.scores = []
         self.state_history = []
         self.events = []
-        # Seed: DIS exista deja in kpis, exact ca in productie (seed data)
-        dis_id = uuid4()
-        self.kpis["DIS"] = dis_id
+        self.kpis["DIS"] = uuid4()
 
     def execute(self, query, params=None):
-        q = " ".join(query.split())  # normalizeaza spatiile
+        q = " ".join(query.split())
         params = params or ()
 
         if q.startswith("INSERT INTO missions"):
@@ -46,10 +47,7 @@ class FakeDB:
         elif q.startswith("SELECT status FROM missions"):
             mission_id, owner_id = params
             m = self.missions.get(mission_id)
-            if m and m["owner_id"] == owner_id:
-                self._last_result = (m["status"],)
-            else:
-                self._last_result = None
+            self._last_result = (m["status"],) if m and m["owner_id"] == owner_id else None
 
         elif q.startswith("UPDATE missions SET status"):
             new_status, mission_id, owner_id = params
@@ -86,11 +84,6 @@ class FakeDB:
             )
             self._last_result = (count,)
 
-        elif q.startswith("SELECT s.score_value FROM scores"):
-            owner_id = params[0]
-            relevant = [s for s in self.scores if self.missions.get(s[2], {}).get("owner_id") == owner_id]
-            self._last_result = (relevant[-1][3],) if relevant else None
-
         else:
             raise NotImplementedError(f"Query neprevazut in FakeDB: {q}")
 
@@ -99,7 +92,6 @@ class FakeDB:
 
 
 def make_fake_connection(fake_db):
-    """Construieste un obiect conexiune/cursor compatibil cu 'with get_connection() as conn'."""
     mock_cur = MagicMock()
     mock_cur.execute.side_effect = fake_db.execute
     mock_cur.fetchone.side_effect = fake_db.fetchone
@@ -113,102 +105,109 @@ def make_fake_connection(fake_db):
     return mock_conn
 
 
-# ============================================================
-# TESTUL DE INTEGRARE PROPRIU-ZIS
-# ============================================================
+class TestMissionVerticalSlice:
+    """
+    Fiecare metoda e un pas din lantul original, in ordine. Starea
+    (fake_db, mission, owner_id) se pastreaza pe instanta (self),
+    la fel cum variabilele se pastrau in scriptul original.
+    """
 
-fake_db = FakeDB()
-owner_id = uuid4()
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.fake_db = FakeDB()
+        self.owner_id = uuid4()
 
-with patch("src.engines.rule.rule_engine.get_connection") as rule_conn, \
-     patch("src.engines.mission.mission_engine.get_connection") as mission_conn, \
-     patch("src.agents.mission.mission_agent.get_connection") as agent_conn:
+        self.patchers = [
+            patch("src.engines.rule.rule_engine.get_connection"),
+            patch("src.engines.mission.mission_engine.get_connection"),
+            patch("src.agents.mission.mission_agent.get_connection"),
+        ]
+        mocks = [p.start() for p in self.patchers]
+        for m in mocks:
+            m.return_value = make_fake_connection(self.fake_db)
 
-    rule_conn.return_value = make_fake_connection(fake_db)
-    mission_conn.return_value = make_fake_connection(fake_db)
-    agent_conn.return_value = make_fake_connection(fake_db)
+        self.rule_engine = RuleEngine()
+        self.mission_engine = MissionEngine(rule_engine=self.rule_engine)
+        self.agent = MissionAgent(mission_engine=self.mission_engine)
 
-    rule_engine = RuleEngine()
-    mission_engine = MissionEngine(rule_engine=rule_engine)
-    agent = MissionAgent(mission_engine=mission_engine)
+        yield
 
-    print("=== PASUL 1: RuleEngine evalueaza — owner nu are misiuni active ===")
-    rule_result = rule_engine.evaluate(owner_id)
-    print("Decizie:", rule_result.decision_outcome)
-    assert rule_result.decision_outcome == "MISSION_READY"
-    print("OK\n")
+        for p in self.patchers:
+            p.stop()
 
-    print("=== PASUL 2: MissionEngine genereaza misiunea (via RuleEngine intern) ===")
-    mission = mission_engine.generate_mission(owner_id, title="Sună-l pe Andrei")
-    print("Mission creata:", mission.id, "status =", mission.status)
-    assert mission.status == "GENERATED"
-    assert mission.id in fake_db.missions
-    print("OK\n")
+    def test_01_rule_engine_evalueaza_ready(self):
+        """RuleEngine evalueaza — owner nu are misiuni active -> MISSION_READY."""
+        result = self.rule_engine.evaluate(self.owner_id)
+        assert result.decision_outcome == "MISSION_READY"
 
-    print("=== PASUL 3: RuleEngine reevaluat — acum owner ARE o misiune activa ===")
-    rule_result_2 = rule_engine.evaluate(owner_id)
-    print("Decizie:", rule_result_2.decision_outcome, "(asteptat: MISSION_BLOCKED)")
-    assert rule_result_2.decision_outcome == "MISSION_BLOCKED"
-    print("OK — RuleEngine si MissionEngine sunt sincronizate prin DB\n")
+    def test_02_mission_engine_genereaza_misiunea(self):
+        """MissionEngine genereaza misiunea (via RuleEngine intern)."""
+        self.mission = self.mission_engine.generate_mission(
+            self.owner_id, title="Sună-l pe Andrei"
+        )
+        assert self.mission.status == "GENERATED"
+        assert self.mission.id in self.fake_db.missions
 
-    print("=== PASUL 4: MissionEngine asigneaza misiunea ===")
-    mission = mission_engine.assign_mission(mission.id, owner_id)
-    print("Status:", mission.status)
-    assert mission.status == "ASSIGNED"
-    print("OK\n")
+    def test_03_rule_engine_reevaluat_blocat(self):
+        """Dupa generare, RuleEngine reevaluat -> MISSION_BLOCKED."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        result = self.rule_engine.evaluate(self.owner_id)
+        assert result.decision_outcome == "MISSION_BLOCKED"
 
-    print("=== PASUL 5: MissionAgent prezinta misiunea liderului ===")
-    text = agent.present_daily_mission(mission)
-    print("Text prezentat:", text)
-    assert "Sună-l pe Andrei" in text
-    print("OK\n")
+    def test_04_asigneaza_misiunea(self):
+        """MissionEngine asigneaza misiunea: GENERATED -> ASSIGNED."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        mission = self.mission_engine.assign_mission(self.mission.id, self.owner_id)
+        assert mission.status == "ASSIGNED"
 
-    print("=== PASUL 6: Liderul confirma 'Sunt gata, incep' — via MissionAgent ===")
-    mission = agent.confirm_and_start(mission.id, owner_id, confirmed=True)
-    print("Status:", mission.status)
-    assert mission.status == "IN_PROGRESS"
-    assert fake_db.missions[mission.id]["status"] == "IN_PROGRESS"
-    print("OK — MissionAgent a delegat corect catre MissionEngine\n")
+    def test_05_agent_prezinta_misiunea(self):
+        """MissionAgent prezinta misiunea liderului, cu titlul inclus."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        text = self.agent.present_daily_mission(self.mission)
+        assert "Sună-l pe Andrei" in text
 
-    print("=== PASUL 7: Fara confirmare, refuz garantat (testat prin Agent, nu doar Engine) ===")
-    other_mission = mission_engine.generate_mission
-    try:
-        agent.confirm_and_start(mission.id, owner_id, confirmed=False)
-        print("EROARE: ar fi trebuit sa refuze")
-    except Exception as e:
-        print("OK: refuzat corect —", type(e).__name__)
-    print()
+    def test_06_confirmare_umana_porneste_misiunea(self):
+        """Confirmarea 'Sunt gata, incep' -> IN_PROGRESS, delegat corect prin Agent."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        self.mission_engine.assign_mission(self.mission.id, self.owner_id)
+        mission = self.agent.confirm_and_start(self.mission.id, self.owner_id, confirmed=True)
+        assert mission.status == "IN_PROGRESS"
+        assert self.fake_db.missions[mission.id]["status"] == "IN_PROGRESS"
 
-    print("=== PASUL 8: Liderul finalizeaza misiunea — via MissionAgent ===")
-    mission = agent.confirm_completion(mission.id, owner_id)
-    print("Status:", mission.status)
-    assert mission.status == "COMPLETED"
-    print("OK\n")
+    def test_07_fara_confirmare_refuz_garantat(self):
+        """Fara confirmed=True, Agentul refuza, chiar daca misiunea exista si e ASSIGNED."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        self.mission_engine.assign_mission(self.mission.id, self.owner_id)
+        from src.engines.mission.mission_engine import HumanConfirmationRequiredError
+        with pytest.raises(HumanConfirmationRequiredError):
+            self.agent.confirm_and_start(self.mission.id, self.owner_id, confirmed=False)
 
-    print("=== PASUL 9: DIS a fost persistat in scores? ===")
-    print("Numar scoruri inregistrate:", len(fake_db.scores))
-    assert len(fake_db.scores) == 1
-    kpi_id, entity_type, entity_id, score_value = fake_db.scores[0][:4]
-    print("kpi_id corect (DIS):", kpi_id == fake_db.kpis["DIS"])
-    print("entity_type:", entity_type, " entity_id == mission.id:", entity_id == mission.id)
-    print("score_value (placeholder):", score_value)
-    assert kpi_id == fake_db.kpis["DIS"]
-    assert entity_type == "mission"
-    print("OK\n")
+    def test_08_finalizare_prin_agent(self):
+        """Liderul finalizeaza misiunea — via MissionAgent."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        self.mission_engine.assign_mission(self.mission.id, self.owner_id)
+        self.agent.confirm_and_start(self.mission.id, self.owner_id, confirmed=True)
+        mission = self.agent.confirm_completion(self.mission.id, self.owner_id)
+        assert mission.status == "COMPLETED"
 
-    print("=== PASUL 10: MissionAgent poate citi DIS-ul proaspat scris (READ-ONLY) ===")
-    dis_score = agent.get_recent_dis_score(owner_id)
-    print("DIS citit de Agent:", dis_score)
-    assert dis_score == score_value
-    print("OK\n")
+    def test_09_dis_persistat_in_scores(self):
+        """Dupa finalizare, DIS a fost persistat corect in scores."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        self.mission_engine.assign_mission(self.mission.id, self.owner_id)
+        self.agent.confirm_and_start(self.mission.id, self.owner_id, confirmed=True)
+        self.agent.confirm_completion(self.mission.id, self.owner_id)
 
-    print("=== PASUL 11: state_history si events au inregistrat toate tranzitiile? ===")
-    print("Tranzitii in state_history:", len(fake_db.state_history))
-    print("Evenimente emise:", len(fake_db.events))
-    assert len(fake_db.state_history) == 3  # ASSIGNED, IN_PROGRESS, COMPLETED
-    assert len(fake_db.events) == 4          # GENERATED + cele 3 de mai sus
-    print("OK\n")
+        assert len(self.fake_db.scores) == 1
+        kpi_id, entity_type, entity_id, score_value = self.fake_db.scores[0][:4]
+        assert kpi_id == self.fake_db.kpis["DIS"]
+        assert entity_type == "mission"
 
-print("=" * 60)
-print("TEST DE INTEGRARE COMPLET — LANTUL INTREG FUNCTIONEAZA IMPREUNA")
-print("=" * 60)
+    def test_10_state_history_si_events_complete(self):
+        """state_history (3 tranzitii) si events (4, inclusiv generarea) inregistrate corect."""
+        self.test_02_mission_engine_genereaza_misiunea()
+        self.mission_engine.assign_mission(self.mission.id, self.owner_id)
+        self.agent.confirm_and_start(self.mission.id, self.owner_id, confirmed=True)
+        self.agent.confirm_completion(self.mission.id, self.owner_id)
+
+        assert len(self.fake_db.state_history) == 3
+        assert len(self.fake_db.events) == 4
