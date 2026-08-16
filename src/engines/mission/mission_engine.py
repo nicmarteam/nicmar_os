@@ -66,6 +66,22 @@ class InvalidTransitionError(Exception):
     """Ridicată la o tranziție de stare neconformă cu _ALLOWED_TRANSITIONS."""
 
 
+class MissionAccessDeniedError(Exception):
+    """
+    Ridicată dacă mission_id nu există SAU nu aparține owner_id-ului dat.
+
+    Mesajul e intenționat identic pentru ambele cazuri (nu există vs.
+    aparține altui owner) — a distinge între ele ar permite unui
+    apelant să deducă, prin încercare, ce ID-uri de misiuni există în
+    sistem, chiar dacă nu le poate accesa (atac de enumerare).
+
+    Descoperit prin Security Isolation Audit (12 august 2026): niciuna
+    din metodele de tranziție nu verifica owner_id înainte de scriere —
+    oricine cunoștea un mission_id putea schimba starea oricărei
+    misiuni, indiferent de proprietar.
+    """
+
+
 class HumanConfirmationRequiredError(Exception):
     """Ridicată dacă se încearcă pornirea unei misiuni fără confirmare umană explicită."""
 
@@ -127,24 +143,32 @@ class MissionEngine:
     # Tranziții — o singură cale de scriere a stării
     # ------------------------------------------------------------------
 
-    def _set_status(self, mission_id: UUID, new_status: str) -> Mission:
+    def _set_status(self, mission_id: UUID, owner_id: UUID, new_status: str) -> Mission:
         """
         SINGURA metodă din tot fișierul care scrie `missions.status`.
 
-        Validează tranziția, scrie noua stare, înregistrează în
-        `state_history`, emite evenimentul corespunzător. Orice altă
-        metodă publică (assign_mission, start_mission, complete_mission)
-        trece prin aceasta — nu duplică logică de scriere.
+        `owner_id` e OBLIGATORIU și verificat — SELECT-ul și UPDATE-ul
+        includ `AND owner_id = %s`. Fără această verificare, oricine
+        cunoștea un mission_id putea schimba starea oricărei misiuni,
+        indiferent de proprietar (Security Isolation Audit, 12 august
+        2026). Dacă misiunea nu există SAU aparține altui owner,
+        ridică MissionAccessDeniedError — același mesaj în ambele
+        cazuri, ca să nu permită enumerare de ID-uri.
         """
         if new_status not in VALID_STATUSES:
             raise InvalidTransitionError(f"Stare necunoscută: {new_status}")
 
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT status FROM missions WHERE id = %s", (mission_id,))
+                cur.execute(
+                    "SELECT status FROM missions WHERE id = %s AND owner_id = %s",
+                    (mission_id, owner_id),
+                )
                 row = cur.fetchone()
                 if row is None:
-                    raise InvalidTransitionError(f"Mission {mission_id} nu există.")
+                    raise MissionAccessDeniedError(
+                        f"Mission {mission_id} nu există sau nu aparține acestui owner."
+                    )
                 current_status = row[0]
 
                 if new_status not in _ALLOWED_TRANSITIONS.get(current_status, set()):
@@ -154,8 +178,9 @@ class MissionEngine:
 
                 cur.execute(
                     "UPDATE missions SET status = %s, updated_at = clock_timestamp() "
-                    "WHERE id = %s RETURNING id, owner_id, title, status",
-                    (new_status, mission_id),
+                    "WHERE id = %s AND owner_id = %s "
+                    "RETURNING id, owner_id, title, status",
+                    (new_status, mission_id, owner_id),
                 )
                 row = cur.fetchone()
 
@@ -171,11 +196,11 @@ class MissionEngine:
         self._emit_event(_EVENT_FOR_STATUS[new_status], mission_id, {"new_status": new_status})
         return mission
 
-    def assign_mission(self, mission_id: UUID) -> Mission:
+    def assign_mission(self, mission_id: UUID, owner_id: UUID) -> Mission:
         """GENERATED -> ASSIGNED. Fără confirmare umană necesară aici (afișare în Dashboard)."""
-        return self._set_status(mission_id, "ASSIGNED")
+        return self._set_status(mission_id, owner_id, "ASSIGNED")
 
-    def start_mission(self, mission_id: UUID, confirmed: bool) -> Mission:
+    def start_mission(self, mission_id: UUID, owner_id: UUID, confirmed: bool) -> Mission:
         """
         ASSIGNED -> IN_PROGRESS.
 
@@ -187,13 +212,13 @@ class MissionEngine:
             raise HumanConfirmationRequiredError(
                 "MissionStarted necesită confirmare umană explicită (confirmed=True)."
             )
-        return self._set_status(mission_id, "IN_PROGRESS")
+        return self._set_status(mission_id, owner_id, "IN_PROGRESS")
 
-    def complete_mission(self, mission_id: UUID) -> Mission:
+    def complete_mission(self, mission_id: UUID, owner_id: UUID) -> Mission:
         """
         IN_PROGRESS -> COMPLETED. Persistă și DIS (placeholder) în `scores`.
         """
-        mission = self._set_status(mission_id, "COMPLETED")
+        mission = self._set_status(mission_id, owner_id, "COMPLETED")
         self._record_dis_score(mission.id, mission.owner_id)
         return mission
 
