@@ -47,3 +47,30 @@ class DisScoreResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error_code: str
     message: str
+
+
+# ------------------------------------------------------------------
+# FollowUp — sursă: 15-followup-api-contract.md
+# ------------------------------------------------------------------
+
+class CreateFollowUpRequest(BaseModel):
+    owner_id: UUID
+    contact_id: UUID
+    conversation_id: UUID
+
+
+class FollowUpResponse(BaseModel):
+    id: UUID
+    owner_id: UUID
+    contact_id: UUID
+    conversation_id: Optional[UUID]
+    status: str
+
+
+class FollowUpActionRequest(BaseModel):
+    """Folosit de complete, postpone, reschedule — toate au nevoie doar de owner_id."""
+    owner_id: UUID
+
+
+class CompleteFollowUpRequest(FollowUpActionRequest):
+    confirmed: bool
