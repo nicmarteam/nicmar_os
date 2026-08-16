@@ -1,8 +1,5 @@
 """
-Schema Pydantic pentru API — Mission.
-
-Sursă: 14-api-contract.md, secțiunea 3. Fiecare model reflectă exact
-request/response-ul documentat, fără câmpuri suplimentare inventate.
+Schema Pydantic pentru API — Mission, FollowUp, Partner și Auth.
 """
 
 from typing import Optional
@@ -58,7 +55,6 @@ class TokenResponse(BaseModel):
 # ------------------------------------------------------------------
 
 class CreateFollowUpRequest(BaseModel):
-    owner_id: UUID
     contact_id: UUID
     conversation_id: UUID
 
@@ -71,12 +67,7 @@ class FollowUpResponse(BaseModel):
     status: str
 
 
-class FollowUpActionRequest(BaseModel):
-    """Folosit de complete, postpone, reschedule — toate au nevoie doar de owner_id."""
-    owner_id: UUID
-
-
-class CompleteFollowUpRequest(FollowUpActionRequest):
+class CompleteFollowUpRequest(BaseModel):
     confirmed: bool
 
 
@@ -85,7 +76,6 @@ class CompleteFollowUpRequest(FollowUpActionRequest):
 # ------------------------------------------------------------------
 
 class DiagnosticRequest(BaseModel):
-    owner_id: UUID
     diagnostic_type: str
 
 
@@ -97,7 +87,6 @@ class DiagnosticResponse(BaseModel):
 
 
 class SendRequest(BaseModel):
-    owner_id: UUID
     confirmed: bool
 
 

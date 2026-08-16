@@ -1,12 +1,15 @@
 """
-Teste pentru Partner API — folosind FastAPI TestClient.
+Teste Partner API + integrare Auth.
 
-Sarite (skip) daca DATABASE_URL nu e setat.
+Regulă de securitate verificată explicit:
+owner_id este derivat exclusiv din JWT. Orice owner_id trimis
+suplimentar de client este ignorat.
 """
 
 import os
 from uuid import uuid4
 
+import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 
@@ -45,14 +48,27 @@ def ensure_kpis_seeded():
                 )
 
 
-def _create_user(prefix: str) -> str:
+def _create_user(prefix: str) -> tuple[str, str, str]:
+    email = f"{prefix}-{uuid4()}@nicmar.local"
+    password = "TestPassword!123"
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO users (email, full_name, role) VALUES (%s, %s, 'LEADER') RETURNING id",
-                (f"{prefix}-{uuid4()}@nicmar.local", f"API Test {prefix}"),
+                "INSERT INTO users (email, full_name, role, password_hash) "
+                "VALUES (%s, %s, 'LEADER', %s) RETURNING id",
+                (email, f"API Test {prefix}", password_hash),
             )
-            return str(cur.fetchone()[0])
+            return str(cur.fetchone()[0]), email, password
+
+
+def _headers(client, email: str, password: str) -> dict:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": password},
+    )
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 def _create_partner(owner_id: str) -> str:
@@ -72,166 +88,167 @@ def _create_partner(owner_id: str) -> str:
             return str(cur.fetchone()[0])
 
 
-# ------------------------------------------------------------------
-# 1. owner corect
-# ------------------------------------------------------------------
-
 def test_diagnostic_correct_owner_success(client):
-    owner_id = _create_user("diag-owner-ok")
+    owner_id, email, password = _create_user("diag-owner-ok")
+    headers = _headers(client, email, password)
     partner_id = _create_partner(owner_id)
 
     response = client.post(
         f"/api/v1/partners/{partner_id}/diagnostic",
-        json={"owner_id": owner_id, "diagnostic_type": "ENCOURAGEMENT"},
+        json={"diagnostic_type": "ENCOURAGEMENT"}, headers=headers,
     )
     assert response.status_code == 201
     body = response.json()
     assert body["diagnostic_type"] == "ENCOURAGEMENT"
+    assert body["owner_id"] == owner_id
     assert "[STUB]" in body["message"]
 
 
-# ------------------------------------------------------------------
-# 2. owner greșit -> refuz
-# ------------------------------------------------------------------
+def test_diagnostic_owner_id_body_is_ignored(client):
+    owner_id, email, password = _create_user("diag-owner-a")
+    other_id, _, _ = _create_user("diag-owner-b")
+    headers = _headers(client, email, password)
+    partner_id = _create_partner(owner_id)
 
-def test_diagnostic_wrong_owner_returns_403(client):
-    """
-    Testul decisiv cerut explicit: Lider B incearca diagnostic pe
-    partenerul lui Lider A, prin HTTP real, pe PostgreSQL real —
-    exact bug-ul #4 gasit azi (impersonare partiala), verificat acum
-    si la nivel HTTP, nu doar Engine direct.
-    """
-    owner_a = _create_user("diag-owner-a")
-    owner_b = _create_user("diag-owner-b")
+    response = client.post(
+        f"/api/v1/partners/{partner_id}/diagnostic",
+        json={"owner_id": other_id, "diagnostic_type": "CLARITY"}, headers=headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["owner_id"] == owner_id
+
+
+def test_diagnostic_wrong_jwt_owner_returns_403(client):
+    owner_a, _, _ = _create_user("diag-jwt-owner-a")
+    _, email_b, password_b = _create_user("diag-jwt-owner-b")
+    headers_b = _headers(client, email_b, password_b)
     partner_id = _create_partner(owner_a)
 
     response = client.post(
         f"/api/v1/partners/{partner_id}/diagnostic",
-        json={"owner_id": owner_b, "diagnostic_type": "CLARITY"},
+        json={"owner_id": owner_a, "diagnostic_type": "CLARITY"}, headers=headers_b,
     )
     assert response.status_code == 403
     assert response.json()["error_code"] == "ACCESS_DENIED"
 
 
-def test_send_wrong_owner_returns_403(client):
-    """Aceeasi verificare, dar pe endpoint-ul /send."""
-    owner_a = _create_user("send-owner-a")
-    owner_b = _create_user("send-owner-b")
+def test_send_wrong_jwt_owner_returns_403(client):
+    owner_a, email_a, password_a = _create_user("send-owner-a")
+    _, email_b, password_b = _create_user("send-owner-b")
+    headers_a = _headers(client, email_a, password_a)
+    headers_b = _headers(client, email_b, password_b)
     partner_id = _create_partner(owner_a)
+
+    diagnostic = client.post(
+        f"/api/v1/partners/{partner_id}/diagnostic",
+        json={"diagnostic_type": "ENCOURAGEMENT"}, headers=headers_a,
+    )
+    assert diagnostic.status_code == 201
 
     response = client.post(
         f"/api/v1/partners/{partner_id}/send",
-        json={"owner_id": owner_b, "confirmed": True},
+        json={"owner_id": owner_a, "confirmed": True}, headers=headers_b,
     )
     assert response.status_code == 403
     assert response.json()["error_code"] == "ACCESS_DENIED"
 
-
-# ------------------------------------------------------------------
-# 3. partner_id inexistent
-# ------------------------------------------------------------------
 
 def test_diagnostic_nonexistent_partner_returns_403(client):
-    """
-    partner_id inexistent -> 403 (nu 404) — acelasi mesaj ca 'nu-i al
-    tau', previne enumerarea de ID-uri (verificat in cod, PartnerAccessDeniedError).
-    """
-    owner_id = _create_user("diag-nonexistent")
-    fake_partner_id = str(uuid4())
+    _, email, password = _create_user("diag-nonexistent")
+    headers = _headers(client, email, password)
 
     response = client.post(
-        f"/api/v1/partners/{fake_partner_id}/diagnostic",
-        json={"owner_id": owner_id, "diagnostic_type": "NEXT_STEP"},
+        f"/api/v1/partners/{uuid4()}/diagnostic",
+        json={"diagnostic_type": "NEXT_STEP"}, headers=headers,
     )
     assert response.status_code == 403
     assert response.json()["error_code"] == "ACCESS_DENIED"
 
 
-# ------------------------------------------------------------------
-# 4. UUID invalid -> 422
-# ------------------------------------------------------------------
-
 class TestInvalidPartnerIdReturns422:
-
     INVALID_ID = "nu-e-un-uuid-valid"
 
     def test_diagnostic_invalid_id_returns_422(self, client):
-        owner_id = _create_user("invalid-diag")
+        _, email, password = _create_user("invalid-diag")
+        headers = _headers(client, email, password)
         response = client.post(
             f"/api/v1/partners/{self.INVALID_ID}/diagnostic",
-            json={"owner_id": owner_id, "diagnostic_type": "ENCOURAGEMENT"},
+            json={"diagnostic_type": "ENCOURAGEMENT"}, headers=headers,
         )
         assert response.status_code == 422
 
     def test_send_invalid_id_returns_422(self, client):
-        owner_id = _create_user("invalid-send")
+        _, email, password = _create_user("invalid-send")
+        headers = _headers(client, email, password)
         response = client.post(
             f"/api/v1/partners/{self.INVALID_ID}/send",
-            json={"owner_id": owner_id, "confirmed": True},
+            json={"confirmed": True}, headers=headers,
         )
         assert response.status_code == 422
 
 
-# ------------------------------------------------------------------
-# 5. flux complet + 6. raspunsul contine scorurile actualizate
-# ------------------------------------------------------------------
-
 def test_full_http_flow_diagnostic_to_send_returns_scores(client):
-    """
-    Flux complet: diagnostic -> send -> raspunsul /send contine PDI+PIP
-    actualizate -> GET /scores confirma aceleasi valori separat.
-    """
-    owner_id = _create_user("full-flow-partner")
+    owner_id, email, password = _create_user("full-flow-partner")
+    headers = _headers(client, email, password)
     partner_id = _create_partner(owner_id)
 
     r1 = client.post(
         f"/api/v1/partners/{partner_id}/diagnostic",
-        json={"owner_id": owner_id, "diagnostic_type": "APPRECIATION"},
+        json={"diagnostic_type": "APPRECIATION"}, headers=headers,
     )
     assert r1.status_code == 201
 
     r2 = client.post(
         f"/api/v1/partners/{partner_id}/send",
-        json={"owner_id": owner_id, "confirmed": True},
+        json={"confirmed": True}, headers=headers,
     )
     assert r2.status_code == 200
     body = r2.json()
     assert body["pdi"] == 1.0
     assert body["pip"] == 1.0
 
-    r3 = client.get("/api/v1/partners/scores", params={"owner_id": owner_id})
+    r3 = client.get(
+        "/api/v1/partners/scores",
+        params={"owner_id": str(uuid4())}, headers=headers,
+    )
     assert r3.status_code == 200
     assert r3.json()["pdi"] == 1.0
     assert r3.json()["pip"] == 1.0
 
 
 def test_send_without_confirmation_returns_400(client):
-    owner_id = _create_user("send-noconfirm")
+    owner_id, email, password = _create_user("send-noconfirm")
+    headers = _headers(client, email, password)
     partner_id = _create_partner(owner_id)
-    client.post(
+
+    diagnostic = client.post(
         f"/api/v1/partners/{partner_id}/diagnostic",
-        json={"owner_id": owner_id, "diagnostic_type": "NEXT_STEP"},
+        json={"diagnostic_type": "NEXT_STEP"}, headers=headers,
     )
+    assert diagnostic.status_code == 201
 
     response = client.post(
         f"/api/v1/partners/{partner_id}/send",
-        json={"owner_id": owner_id, "confirmed": False},
+        json={"owner_id": str(uuid4()), "confirmed": False}, headers=headers,
     )
     assert response.status_code == 400
     assert response.json()["error_code"] == "CONFIRMATION_REQUIRED"
 
 
 def test_second_diagnostic_same_day_returns_409(client):
-    owner_id = _create_user("diag-duplicate")
+    owner_id, email, password = _create_user("diag-duplicate")
+    headers = _headers(client, email, password)
     partner_id = _create_partner(owner_id)
-    client.post(
+
+    first = client.post(
         f"/api/v1/partners/{partner_id}/diagnostic",
-        json={"owner_id": owner_id, "diagnostic_type": "ENCOURAGEMENT"},
+        json={"diagnostic_type": "ENCOURAGEMENT"}, headers=headers,
     )
+    assert first.status_code == 201
 
     response = client.post(
         f"/api/v1/partners/{partner_id}/diagnostic",
-        json={"owner_id": owner_id, "diagnostic_type": "CLARITY"},
+        json={"diagnostic_type": "CLARITY"}, headers=headers,
     )
     assert response.status_code == 409
     assert response.json()["error_code"] == "ALREADY_EXISTS"

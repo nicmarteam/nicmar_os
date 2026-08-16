@@ -1,17 +1,12 @@
 """
-Router FollowUp — API, sursă: 15-followup-api-contract.md, secțiunea 2
-(corectată: dis-score primește doar owner_id, fără followup_id).
+Router FollowUp — API, sursă: 15-followup-api-contract.md.
 
-Decizie de design: GET /followups (listă) apelează
-FollowUpEngine.list_pending_followups() direct, NU
-FollowUpAgent.present_followup_list() — acesta din urmă întoarce un
-singur string formatat (potrivit pentru afișare text unică), nu o
-listă structurată JSON, de care are nevoie un consumator API/Dashboard.
-Aceeași logică ca la Mission (create_mission apelează Engine direct,
-fără metodă Agent de creare).
+SECURITATE:
+owner_id NU mai vine din request (body/query). Vine exclusiv din
+get_current_user() — orice owner_id trimis manual de client este ignorat.
 
-followup_id: UUID direct, din prima versiune (lecția de la Mission API,
-unde a fost nevoie de o corectură ulterioară de la str la UUID).
+Engine-ul păstrează owner_id ca parametru Python pentru verificarea
+ownership-ului. Doar sursa lui s-a schimbat: JWT -> current_user.id.
 """
 
 from uuid import UUID
@@ -20,9 +15,12 @@ from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_followup_agent, get_followup_engine
 from src.api.schemas import (
-    CreateFollowUpRequest, FollowUpResponse, FollowUpActionRequest,
-    CompleteFollowUpRequest, DisScoreResponse,
+    CreateFollowUpRequest,
+    FollowUpResponse,
+    CompleteFollowUpRequest,
+    DisScoreResponse,
 )
+from src.auth.dependencies import get_current_user, CurrentUser
 from src.agents.followup.followup_agent import FollowUpAgent
 from src.engines.followup.followup_engine import FollowUpEngine
 
@@ -31,8 +29,10 @@ router = APIRouter(prefix="/api/v1/followups", tags=["followups"])
 
 def _to_response(followup) -> FollowUpResponse:
     return FollowUpResponse(
-        id=followup.id, owner_id=followup.owner_id,
-        contact_id=followup.contact_id, conversation_id=followup.conversation_id,
+        id=followup.id,
+        owner_id=followup.owner_id,
+        contact_id=followup.contact_id,
+        conversation_id=followup.conversation_id,
         status=followup.status,
     )
 
@@ -40,22 +40,23 @@ def _to_response(followup) -> FollowUpResponse:
 @router.post("", response_model=FollowUpResponse, status_code=201)
 def create_followup(
     body: CreateFollowUpRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     followup_engine: FollowUpEngine = Depends(get_followup_engine),
 ):
-    """Creează un follow-up nou — apelează FollowUpEngine direct (fără metodă Agent de creare)."""
+    """Creează follow-up pentru utilizatorul autentificat."""
     followup = followup_engine.create_from_trigger(
-        body.owner_id, body.contact_id, body.conversation_id
+        current_user.id, body.contact_id, body.conversation_id
     )
     return _to_response(followup)
 
 
 @router.get("", response_model=list[FollowUpResponse])
 def list_followups(
-    owner_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     followup_engine: FollowUpEngine = Depends(get_followup_engine),
 ):
-    """Listă structurată JSON — apelează FollowUpEngine.list_pending_followups() direct."""
-    followups = followup_engine.list_pending_followups(owner_id)
+    """Listează doar follow-up-urile PENDING ale utilizatorului autentificat."""
+    followups = followup_engine.list_pending_followups(current_user.id)
     return [_to_response(f) for f in followups]
 
 
@@ -63,40 +64,43 @@ def list_followups(
 def complete_followup(
     followup_id: UUID,
     body: CompleteFollowUpRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
-    """Confirmare umană — deleagă la FollowUpAgent.confirm_completion."""
-    followup = followup_agent.confirm_completion(followup_id, body.owner_id, confirmed=body.confirmed)
+    """Confirmare umană — owner_id este identitatea JWT."""
+    followup = followup_agent.confirm_completion(
+        followup_id, current_user.id, confirmed=body.confirmed
+    )
     return _to_response(followup)
 
 
 @router.post("/{followup_id}/postpone", response_model=FollowUpResponse)
 def postpone_followup(
     followup_id: UUID,
-    body: FollowUpActionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
-    """Deleagă la FollowUpAgent.request_postpone — fără confirmed (verificat, semnătura reală n-o cere)."""
-    followup = followup_agent.request_postpone(followup_id, body.owner_id)
+    """Amână follow-up-ul utilizatorului autentificat."""
+    followup = followup_agent.request_postpone(followup_id, current_user.id)
     return _to_response(followup)
 
 
 @router.post("/{followup_id}/reschedule", response_model=FollowUpResponse)
 def reschedule_followup(
     followup_id: UUID,
-    body: FollowUpActionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
-    """Deleagă la FollowUpAgent.request_reschedule — fără confirmed."""
-    followup = followup_agent.request_reschedule(followup_id, body.owner_id)
+    """Reprogramează follow-up-ul utilizatorului autentificat."""
+    followup = followup_agent.request_reschedule(followup_id, current_user.id)
     return _to_response(followup)
 
 
 @router.get("/dis-score", response_model=DisScoreResponse)
 def get_dis_score(
-    owner_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     followup_agent: FollowUpAgent = Depends(get_followup_agent),
 ):
-    """READ-ONLY — doar owner_id, fără followup_id (corectat față de propunerea inițială)."""
-    score = followup_agent.get_recent_dis_score(owner_id)
+    """READ-ONLY — scorul DIS al utilizatorului autentificat."""
+    score = followup_agent.get_recent_dis_score(current_user.id)
     return DisScoreResponse(dis_score=score)
