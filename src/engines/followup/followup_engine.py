@@ -34,7 +34,7 @@ Nu implementate (out of scope v1, conform contractului):
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from src.data.db import get_connection
@@ -152,6 +152,39 @@ class FollowUpEngine:
         self._emit_event("FollowUpTriggered", followup.id, {"conversation_id": str(conversation_id)})
         self._record_dis_score(followup.id, owner_id)
         return followup
+
+    # ------------------------------------------------------------------
+    # Citire — READ-ONLY, necesară pentru API (GET /followups)
+    # ------------------------------------------------------------------
+
+    def list_pending_followups(self, owner_id: UUID) -> List[FollowUp]:
+        """
+        Listează follow-up-urile PENDING ale unui owner (READ-ONLY).
+
+        Filtrare OBLIGATORIE prin owner_id — aceeași disciplină de
+        izolare ca la toate celelalte metode de citire (get_mission,
+        get_recent_dis_score etc.). Doar status='PENDING' — celelalte
+        stări (COMPLETED, POSTPONED, RESCHEDULED) nu apar în lista
+        zilnică de acțiuni.
+
+        Fără modificări în `follow_ups` — un singur SELECT.
+        """
+        query = """
+            SELECT id, owner_id, contact_id, conversation_id, status
+            FROM follow_ups
+            WHERE owner_id = %s AND status = 'PENDING'
+            ORDER BY created_at ASC
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (owner_id,))
+                rows = cur.fetchall()
+
+        return [
+            FollowUp(id=row[0], owner_id=row[1], contact_id=row[2],
+                     conversation_id=row[3], status=row[4])
+            for row in rows
+        ]
 
     # ------------------------------------------------------------------
     # Tranziții — o singură cale de scriere a stării
