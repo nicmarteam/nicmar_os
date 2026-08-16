@@ -74,3 +74,29 @@ class FollowUpActionRequest(BaseModel):
 
 class CompleteFollowUpRequest(FollowUpActionRequest):
     confirmed: bool
+
+
+# ------------------------------------------------------------------
+# Partner — sursă: 16-partner-api-contract.md
+# ------------------------------------------------------------------
+
+class DiagnosticRequest(BaseModel):
+    owner_id: UUID
+    diagnostic_type: str
+
+
+class DiagnosticResponse(BaseModel):
+    partner_id: UUID
+    owner_id: UUID
+    diagnostic_type: str
+    message: str
+
+
+class SendRequest(BaseModel):
+    owner_id: UUID
+    confirmed: bool
+
+
+class PartnerScoresResponse(BaseModel):
+    pdi: Optional[float] = None
+    pip: Optional[float] = None
