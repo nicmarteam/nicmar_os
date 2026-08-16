@@ -61,6 +61,9 @@ def decode_access_token(token: str) -> UUID:
     """
     payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
     try:
-        return UUID(payload["sub"])
-    except (KeyError, TypeError, ValueError) as exc:
+        subject = payload["sub"]
+        if not isinstance(subject, str):
+            raise ValueError("Invalid token subject type.")
+        return UUID(subject)
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise jwt.InvalidTokenError("Invalid token subject.") from exc
