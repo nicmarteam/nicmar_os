@@ -8,6 +8,8 @@ dependencies = [
     # Folosit direct de src/data/db.py, src/engines/*, tot lantul
     # Rule -> Engine -> Data -> Agent testat azi (Mission, FollowUp, Partner).
     "psycopg[binary]>=3.1",
+    # API — src/api/*, primul endpoint (Mission) testat cu PostgreSQL real.
+    "fastapi>=0.100",
     # Folosite de src/llm/provider_factory.py (existent inainte de
     # vertical slice-urile de azi) — neinvocate de tests/, dar parte
     # reala a codului din repo, nu inventate aici.
@@ -19,6 +21,8 @@ dependencies = [
 dev = [
     # Versiunea testata azi la refactorizarea celor 9 fisiere de test.
     "pytest>=7.0",
+    # Necesar pentru fastapi.testclient.TestClient (test_mission_api.py).
+    "httpx",
 ]
 
 # ------------------------------------------------------------------
