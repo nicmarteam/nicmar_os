@@ -44,15 +44,21 @@ class FakeDB:
             self._last_result = (mission_id, owner_id, title, "GENERATED")
 
         elif q.startswith("SELECT status FROM missions"):
-            (mission_id,) = params
+            mission_id, owner_id = params
             m = self.missions.get(mission_id)
-            self._last_result = (m["status"],) if m else None
+            if m and m["owner_id"] == owner_id:
+                self._last_result = (m["status"],)
+            else:
+                self._last_result = None
 
         elif q.startswith("UPDATE missions SET status"):
-            new_status, mission_id = params
-            m = self.missions[mission_id]
-            m["status"] = new_status
-            self._last_result = (mission_id, m["owner_id"], m["title"], new_status)
+            new_status, mission_id, owner_id = params
+            m = self.missions.get(mission_id)
+            if m and m["owner_id"] == owner_id:
+                m["status"] = new_status
+                self._last_result = (mission_id, m["owner_id"], m["title"], new_status)
+            else:
+                self._last_result = None
 
         elif q.startswith("INSERT INTO state_history"):
             self.state_history.append(params)
@@ -146,7 +152,7 @@ with patch("src.engines.rule.rule_engine.get_connection") as rule_conn, \
     print("OK — RuleEngine si MissionEngine sunt sincronizate prin DB\n")
 
     print("=== PASUL 4: MissionEngine asigneaza misiunea ===")
-    mission = mission_engine.assign_mission(mission.id)
+    mission = mission_engine.assign_mission(mission.id, owner_id)
     print("Status:", mission.status)
     assert mission.status == "ASSIGNED"
     print("OK\n")
@@ -158,7 +164,7 @@ with patch("src.engines.rule.rule_engine.get_connection") as rule_conn, \
     print("OK\n")
 
     print("=== PASUL 6: Liderul confirma 'Sunt gata, incep' — via MissionAgent ===")
-    mission = agent.confirm_and_start(mission.id, confirmed=True)
+    mission = agent.confirm_and_start(mission.id, owner_id, confirmed=True)
     print("Status:", mission.status)
     assert mission.status == "IN_PROGRESS"
     assert fake_db.missions[mission.id]["status"] == "IN_PROGRESS"
@@ -167,14 +173,14 @@ with patch("src.engines.rule.rule_engine.get_connection") as rule_conn, \
     print("=== PASUL 7: Fara confirmare, refuz garantat (testat prin Agent, nu doar Engine) ===")
     other_mission = mission_engine.generate_mission
     try:
-        agent.confirm_and_start(mission.id, confirmed=False)
+        agent.confirm_and_start(mission.id, owner_id, confirmed=False)
         print("EROARE: ar fi trebuit sa refuze")
     except Exception as e:
         print("OK: refuzat corect —", type(e).__name__)
     print()
 
     print("=== PASUL 8: Liderul finalizeaza misiunea — via MissionAgent ===")
-    mission = agent.confirm_completion(mission.id)
+    mission = agent.confirm_completion(mission.id, owner_id)
     print("Status:", mission.status)
     assert mission.status == "COMPLETED"
     print("OK\n")
