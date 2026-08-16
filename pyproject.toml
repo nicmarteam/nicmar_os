@@ -10,6 +10,11 @@ dependencies = [
     "psycopg[binary]>=3.1",
     # API — src/api/*, primul endpoint (Mission) testat cu PostgreSQL real.
     "fastapi>=0.100",
+    # Auth — hash parole + JWT. NU passlib: testat, incompatibil real
+    # cu bcrypt>=4.1 (eroare confirmata, passlib neintretinut din 2020).
+    # bcrypt folosit direct, fara wrapper.
+    "bcrypt==5.0.0",
+    "pyjwt==2.13.0",
     # Folosite de src/llm/provider_factory.py (existent inainte de
     # vertical slice-urile de azi) — neinvocate de tests/, dar parte
     # reala a codului din repo, nu inventate aici.
