@@ -1,16 +1,15 @@
 """
-Test de integrare — Contact->FollowUp Vertical Slice, cap-coada.
-
-FakeDB in memorie, extinsa cu follow_ups, la fel ca Mission slice.
+Test de integrare — Contact->FollowUp Vertical Slice, cap-coada, ca teste
+pytest reale. Acelasi tipar ca test_integration_mission_slice.py.
 """
-import sys
-sys.path.insert(0, '/home/claude/nicmar_impl')
 
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 from src.engines.rule.rule_engine import RuleEngine
-from src.engines.followup.followup_engine import FollowUpEngine
+from src.engines.followup.followup_engine import FollowUpEngine, FollowUpDuplicateError
 from src.agents.followup.followup_agent import FollowUpAgent
 
 
@@ -38,10 +37,7 @@ class FakeDB:
         elif q.startswith("SELECT status FROM follow_ups"):
             fid, owner_id = params
             f = self.follow_ups.get(fid)
-            if f and f["owner_id"] == owner_id:
-                self._last_result = (f["status"],)
-            else:
-                self._last_result = None
+            self._last_result = (f["status"],) if f and f["owner_id"] == owner_id else None
 
         elif q.startswith("UPDATE follow_ups SET status"):
             new_status, fid, owner_id = params
@@ -77,7 +73,10 @@ class FakeDB:
 
         elif q.startswith("SELECT s.score_value FROM scores"):
             owner_id = params[0]
-            relevant = [s for s in self.scores if self.follow_ups.get(s[2], {}).get("owner_id") == owner_id]
+            relevant = [
+                s for s in self.scores
+                if self.follow_ups.get(s[2], {}).get("owner_id") == owner_id
+            ]
             self._last_result = (relevant[-1][3],) if relevant else None
 
         else:
@@ -100,75 +99,92 @@ def make_fake_connection(fake_db):
     return mock_conn
 
 
-fake_db = FakeDB()
-owner_id = uuid4()
-contact_id = uuid4()
-conversation_id = uuid4()
+class TestFollowUpVerticalSlice:
 
-with patch("src.engines.rule.rule_engine.get_connection") as rule_conn, \
-     patch("src.engines.followup.followup_engine.get_connection") as fu_conn, \
-     patch("src.agents.followup.followup_agent.get_connection") as agent_conn:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.fake_db = FakeDB()
+        self.owner_id = uuid4()
+        self.contact_id = uuid4()
+        self.conversation_id = uuid4()
 
-    rule_conn.return_value = make_fake_connection(fake_db)
-    fu_conn.return_value = make_fake_connection(fake_db)
-    agent_conn.return_value = make_fake_connection(fake_db)
+        self.patchers = [
+            patch("src.engines.rule.rule_engine.get_connection"),
+            patch("src.engines.followup.followup_engine.get_connection"),
+            patch("src.agents.followup.followup_agent.get_connection"),
+        ]
+        mocks = [p.start() for p in self.patchers]
+        for m in mocks:
+            m.return_value = make_fake_connection(self.fake_db)
 
-    rule_engine = RuleEngine()
-    followup_engine = FollowUpEngine(rule_engine=rule_engine)
-    agent = FollowUpAgent(followup_engine=followup_engine)
+        self.rule_engine = RuleEngine()
+        self.followup_engine = FollowUpEngine(rule_engine=self.rule_engine)
+        self.agent = FollowUpAgent(followup_engine=self.followup_engine)
 
-    print("=== PASUL 1: RuleEngine — nicio conversatie cu follow-up PENDING ===")
-    r1 = rule_engine.evaluate_followup(conversation_id)
-    print("Decizie:", r1.decision_outcome)
-    assert r1.decision_outcome == "FOLLOWUP_READY"
-    print("OK\n")
+        yield
 
-    print("=== PASUL 2: FollowUpEngine creeaza follow-up-ul + persista DIS imediat ===")
-    followup = followup_engine.create_from_trigger(owner_id, contact_id, conversation_id)
-    print("FollowUp creat:", followup.id, "status =", followup.status)
-    assert followup.status == "PENDING"
-    assert len(fake_db.scores) == 1
-    print("OK — DIS persistat la creare (nu la finalizare, conform sursei)\n")
+        for p in self.patchers:
+            p.stop()
 
-    print("=== PASUL 3: RuleEngine reevaluat — acum exista deja un PENDING pe conversatie ===")
-    r2 = rule_engine.evaluate_followup(conversation_id)
-    print("Decizie:", r2.decision_outcome, "(asteptat: FOLLOWUP_DUPLICATE)")
-    assert r2.decision_outcome == "FOLLOWUP_DUPLICATE"
-    print("OK — RuleEngine si FollowUpEngine sincronizate prin DB\n")
+    def _create(self):
+        self.followup = self.followup_engine.create_from_trigger(
+            self.owner_id, self.contact_id, self.conversation_id
+        )
 
-    print("=== PASUL 4: FollowUpAgent prezinta lista ===")
-    text = agent.present_followup_list([followup])
-    print(text)
-    assert str(contact_id) in text
-    print("OK\n")
+    def test_01_rule_engine_ready_fara_duplicate(self):
+        """RuleEngine — nicio conversatie cu follow-up PENDING -> FOLLOWUP_READY."""
+        result = self.rule_engine.evaluate_followup(self.conversation_id)
+        assert result.decision_outcome == "FOLLOWUP_READY"
 
-    print("=== PASUL 5: Fara confirmare, refuz garantat (prin Agent) ===")
-    try:
-        agent.confirm_completion(followup.id, owner_id, confirmed=False)
-        print("EROARE: ar fi trebuit sa refuze")
-    except Exception as e:
-        print("OK: refuzat —", type(e).__name__)
-    print()
+    def test_02_creare_persista_dis_imediat(self):
+        """FollowUpEngine creeaza follow-up-ul si persista DIS imediat (nu la finalizare)."""
+        self._create()
+        assert self.followup.status == "PENDING"
+        assert len(self.fake_db.scores) == 1
 
-    print("=== PASUL 6: Liderul confirma finalizarea — via Agent ===")
-    followup = agent.confirm_completion(followup.id, owner_id, confirmed=True)
-    print("Status:", followup.status)
-    assert followup.status == "COMPLETED"
-    assert fake_db.follow_ups[followup.id]["status"] == "COMPLETED"
-    print("OK — Agent a delegat corect catre Engine\n")
+    def test_03_rule_engine_reevaluat_duplicate(self):
+        """Dupa creare, RuleEngine reevaluat -> FOLLOWUP_DUPLICATE."""
+        self._create()
+        result = self.rule_engine.evaluate_followup(self.conversation_id)
+        assert result.decision_outcome == "FOLLOWUP_DUPLICATE"
 
-    print("=== PASUL 7: Agentul poate citi DIS-ul (READ-ONLY) ===")
-    dis = agent.get_recent_dis_score(owner_id)
-    print("DIS citit:", dis)
-    assert dis == 1.0
-    print("OK\n")
+    def test_04_al_doilea_followup_refuzat(self):
+        """Al doilea follow-up pe aceeasi conversatie e refuzat."""
+        self._create()
+        with pytest.raises(FollowUpDuplicateError):
+            self.followup_engine.create_from_trigger(
+                self.owner_id, self.contact_id, self.conversation_id
+            )
 
-    print("=== PASUL 8: state_history + events inregistrate corect ===")
-    print("Tranzitii:", len(fake_db.state_history), " Evenimente:", len(fake_db.events))
-    assert len(fake_db.state_history) == 1  # doar COMPLETED (PENDING e starea initiala, nu o tranzitie)
-    assert len(fake_db.events) == 2          # FollowUpTriggered + FollowUpCompleted
-    print("OK\n")
+    def test_05_agent_prezinta_lista(self):
+        """FollowUpAgent prezinta lista, cu contact_id inclus in text."""
+        self._create()
+        text = self.agent.present_followup_list([self.followup])
+        assert str(self.contact_id) in text
 
-print("=" * 60)
-print("TEST DE INTEGRARE FOLLOWUP COMPLET — LANTUL FUNCTIONEAZA")
-print("=" * 60)
+    def test_06_fara_confirmare_refuz_garantat(self):
+        """Fara confirmed=True, Agentul refuza finalizarea."""
+        self._create()
+        with pytest.raises(Exception):
+            self.agent.confirm_completion(self.followup.id, self.owner_id, confirmed=False)
+
+    def test_07_confirmare_finalizeaza(self):
+        """Liderul confirma finalizarea — via Agent, delegat corect."""
+        self._create()
+        followup = self.agent.confirm_completion(self.followup.id, self.owner_id, confirmed=True)
+        assert followup.status == "COMPLETED"
+        assert self.fake_db.follow_ups[followup.id]["status"] == "COMPLETED"
+
+    def test_08_agent_citeste_dis_readonly(self):
+        """Agentul poate citi DIS-ul (READ-ONLY), valoare corecta."""
+        self._create()
+        self.agent.confirm_completion(self.followup.id, self.owner_id, confirmed=True)
+        dis = self.agent.get_recent_dis_score(self.owner_id)
+        assert dis == 1.0
+
+    def test_09_state_history_si_events_complete(self):
+        """state_history (1 tranzitie) si events (2, creare + completare) corecte."""
+        self._create()
+        self.agent.confirm_completion(self.followup.id, self.owner_id, confirmed=True)
+        assert len(self.fake_db.state_history) == 1
+        assert len(self.fake_db.events) == 2
