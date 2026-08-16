@@ -62,6 +62,18 @@ class PartnerDiagnosticAlreadyGeneratedError(Exception):
     """Ridicată când RuleEngine returnează PARTNER_ALREADY_DIAGNOSED."""
 
 
+class PartnerAccessDeniedError(Exception):
+    """
+    Ridicată dacă partner_id nu există SAU nu aparține owner_id-ului dat.
+
+    Mesaj identic pentru ambele cazuri — previne enumerare de ID-uri.
+    Descoperit prin Security Isolation Audit (12 august 2026, testat
+    pe PostgreSQL real): nicio metodă de scriere nu verifica anterior
+    că partner_id aparține owner_id-ului apelant — un lider putea
+    genera diagnostic/persista PDI-PIP pentru partenerul altui lider.
+    """
+
+
 class InvalidDiagnosticTypeError(Exception):
     """Ridicată dacă diagnostic_type nu e una din cele 4 variante fixe."""
 
@@ -92,6 +104,28 @@ class PartnerEngine:
         self.rule_engine = rule_engine
 
     # ------------------------------------------------------------------
+    # Verificare proprietate — folosită de ambele metode de scriere
+    # ------------------------------------------------------------------
+
+    def _verify_ownership(self, partner_id: UUID, owner_id: UUID) -> None:
+        """
+        Verifică real, în `partners`, că partner_id aparține owner_id-ului
+        dat. Fără această verificare, orice lider putea acționa asupra
+        partenerilor altui lider (Security Isolation Audit, 12 august
+        2026, descoperit pe PostgreSQL real).
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM partners WHERE id = %s AND owner_id = %s",
+                    (partner_id, owner_id),
+                )
+                if cur.fetchone() is None:
+                    raise PartnerAccessDeniedError(
+                        f"Partner {partner_id} nu există sau nu aparține acestui owner."
+                    )
+
+    # ------------------------------------------------------------------
     # Diagnostic — trece prin RuleEngine, tip ales de apelant
     # ------------------------------------------------------------------
 
@@ -99,13 +133,16 @@ class PartnerEngine:
         self, partner_id: UUID, owner_id: UUID, diagnostic_type: str
     ) -> PartnerDiagnostic:
         """
-        Generează un diagnostic + mesaj (STUB), DOAR dacă RuleEngine
-        confirmă PARTNER_READY (partenerul n-a primit deja unul azi).
+        Generează un diagnostic + mesaj (STUB), DOAR dacă:
+        1. partner_id chiar aparține owner_id-ului (verificat real, nu presupus)
+        2. RuleEngine confirmă PARTNER_READY (n-a primit deja unul azi)
 
         `diagnostic_type` trebuie să fie unul din VALID_DIAGNOSTIC_TYPES
         — motorul nu alege singur tipul (nicio formulă de selecție nu
         există în sursă).
         """
+        self._verify_ownership(partner_id, owner_id)
+
         if diagnostic_type not in VALID_DIAGNOSTIC_TYPES:
             raise InvalidDiagnosticTypeError(
                 f"diagnostic_type invalid: {diagnostic_type}. "
@@ -142,9 +179,14 @@ class PartnerEngine:
         nu la generarea diagnosticului (verificat din sursă, Ecranul 8:
         "Se recalculează automat PDI" — după trimitere, nu înainte).
 
+        Verifică real proprietatea (partner_id aparține owner_id) —
+        aceeași corectură de securitate ca la generate_diagnostic.
+
         `confirmed` fără valoare implicită — motorul refuză activ
         fără ea, identic cu Mission/FollowUp.
         """
+        self._verify_ownership(partner_id, owner_id)
+
         if not confirmed:
             raise HumanConfirmationRequiredError(
                 "Finalizarea interacțiunii necesită confirmare umană "
