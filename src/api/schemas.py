@@ -16,6 +16,10 @@ class CreateMissionRequest(BaseModel):
     title: str
 
 
+class AssignMissionRequest(BaseModel):
+    owner_id: UUID
+
+
 class MissionResponse(BaseModel):
     id: UUID
     owner_id: UUID
