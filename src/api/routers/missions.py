@@ -62,36 +62,36 @@ def assign_mission(
 
 @router.get("/{mission_id}/present", response_model=PresentMissionResponse)
 def present_mission(
-    mission_id: str,
+    mission_id: UUID,
     owner_id: str,
     mission_agent: MissionAgent = Depends(get_mission_agent),
     mission_engine: MissionEngine = Depends(get_mission_engine),
 ):
     """Citește misiunea, apoi cere Agentului textul de prezentare."""
-    mission = mission_engine.get_mission(UUID(mission_id), UUID(owner_id))
+    mission = mission_engine.get_mission(mission_id, UUID(owner_id))
     text = mission_agent.present_daily_mission(mission)
     return PresentMissionResponse(text=text)
 
 
 @router.post("/{mission_id}/start", response_model=MissionResponse)
 def start_mission(
-    mission_id: str,
+    mission_id: UUID,
     body: StartMissionRequest,
     mission_agent: MissionAgent = Depends(get_mission_agent),
 ):
     """Confirmare umană — 'Sunt gata, încep' — deleagă la MissionAgent."""
-    mission = mission_agent.confirm_and_start(UUID(mission_id), body.owner_id, confirmed=body.confirmed)
+    mission = mission_agent.confirm_and_start(mission_id, body.owner_id, confirmed=body.confirmed)
     return _to_response(mission)
 
 
 @router.post("/{mission_id}/complete", response_model=MissionResponse)
 def complete_mission(
-    mission_id: str,
+    mission_id: UUID,
     body: CompleteMissionRequest,
     mission_agent: MissionAgent = Depends(get_mission_agent),
 ):
     """Finalizare — deleagă la MissionAgent, care persistă și DIS."""
-    mission = mission_agent.confirm_completion(UUID(mission_id), body.owner_id)
+    mission = mission_agent.confirm_completion(mission_id, body.owner_id)
     return _to_response(mission)
 
 
