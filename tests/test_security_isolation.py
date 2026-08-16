@@ -1,13 +1,13 @@
 """
-Security Isolation Audit — teste negative cu 2 lideri, pentru Mission
-si FollowUp. Demonstreaza ca Agent A NU poate actiona asupra datelor
-Liderului B, dupa corectarea gaurii gasite in _set_status.
+Security Isolation Audit — teste negative reale, cu 2 lideri, ca teste
+pytest, pentru Mission si FollowUp. Demonstreaza ca Agent A NU poate
+actiona asupra datelor Liderului B.
 """
-import sys
-sys.path.insert(0, '/home/claude/nicmar_impl')
 
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from src.engines.rule.rule_engine import RuleEngine
 from src.engines.mission.mission_engine import MissionEngine, MissionAccessDeniedError
@@ -117,95 +117,91 @@ def make_conn(fake_db):
     return conn
 
 
-print("=" * 70)
-print("SECURITY ISOLATION AUDIT — MISSION")
-print("=" * 70)
+class TestMissionSecurityIsolation:
 
-fake_db = FakeMissionDB()
-lider_A = uuid4()
-lider_B = uuid4()
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.fake_db = FakeMissionDB()
+        self.lider_a = uuid4()
+        self.lider_b = uuid4()
 
-with patch("src.engines.rule.rule_engine.get_connection") as rc, \
-     patch("src.engines.mission.mission_engine.get_connection") as mc, \
-     patch("src.agents.mission.mission_agent.get_connection") as ac:
-    rc.return_value = make_conn(fake_db)
-    mc.return_value = make_conn(fake_db)
-    ac.return_value = make_conn(fake_db)
+        self.patchers = [
+            patch("src.engines.rule.rule_engine.get_connection"),
+            patch("src.engines.mission.mission_engine.get_connection"),
+            patch("src.agents.mission.mission_agent.get_connection"),
+        ]
+        mocks = [p.start() for p in self.patchers]
+        for m in mocks:
+            m.return_value = make_conn(self.fake_db)
 
-    rule_engine = RuleEngine()
-    mission_engine = MissionEngine(rule_engine=rule_engine)
-    agent_A = MissionAgent(mission_engine=mission_engine)
+        self.rule_engine = RuleEngine()
+        self.mission_engine = MissionEngine(rule_engine=self.rule_engine)
+        self.agent_a = MissionAgent(mission_engine=self.mission_engine)
 
-    print("\n--- Lider A creeaza o misiune ---")
-    mission_B = mission_engine.generate_mission(lider_B, title="Misiunea confidentiala a lui B")
-    print("Misiune creata pentru Lider B:", mission_B.id)
+        self.mission_b = self.mission_engine.generate_mission(
+            self.lider_b, title="Misiune confidentiala Lider B"
+        )
 
-    print("\n--- TEST NEGATIV: Lider A incearca sa modifice misiunea lui B ---")
-    try:
-        mission_engine.assign_mission(mission_B.id, lider_A)
-        print("!!! EROARE GRAVA: Lider A a putut modifica misiunea lui B !!!")
-        sys.exit(1)
-    except MissionAccessDeniedError:
-        print("OK: MissionAccessDeniedError — Lider A NU a putut accesa misiunea lui B")
+        yield
 
-    print("\n--- TEST NEGATIV: Lider A incearca sa porneasca misiunea lui B (prin Agent) ---")
-    try:
-        agent_A.confirm_and_start(mission_B.id, lider_A, confirmed=True)
-        print("!!! EROARE GRAVA: Agent A a putut porni misiunea lui B !!!")
-        sys.exit(1)
-    except MissionAccessDeniedError:
-        print("OK: refuzat corect, chiar si prin Agent, nu doar Engine direct")
+        for p in self.patchers:
+            p.stop()
 
-    print("\n--- Verificare pozitiva: Lider B ISI poate modifica propria misiune ---")
-    mission_B = mission_engine.assign_mission(mission_B.id, lider_B)
-    print("OK: Lider B a reusit, status =", mission_B.status)
+    def test_lider_a_nu_poate_modifica_misiunea_lui_b_direct(self):
+        """Prin Engine direct, Lider A nu poate schimba starea misiunii lui B."""
+        with pytest.raises(MissionAccessDeniedError):
+            self.mission_engine.assign_mission(self.mission_b.id, self.lider_a)
 
+    def test_lider_a_nu_poate_porni_misiunea_lui_b_prin_agent(self):
+        """Nici prin Agent — nu doar Engine direct — Lider A nu acceseaza misiunea lui B."""
+        with pytest.raises(MissionAccessDeniedError):
+            self.agent_a.confirm_and_start(self.mission_b.id, self.lider_a, confirmed=True)
 
-print()
-print("=" * 70)
-print("SECURITY ISOLATION AUDIT — FOLLOWUP")
-print("=" * 70)
-
-fake_db_2 = FakeFollowUpDB()
-
-with patch("src.engines.rule.rule_engine.get_connection") as rc, \
-     patch("src.engines.followup.followup_engine.get_connection") as fc, \
-     patch("src.agents.followup.followup_agent.get_connection") as ac:
-    rc.return_value = make_conn(fake_db_2)
-    fc.return_value = make_conn(fake_db_2)
-    ac.return_value = make_conn(fake_db_2)
-
-    rule_engine_2 = RuleEngine()
-    followup_engine = FollowUpEngine(rule_engine=rule_engine_2)
-    agent_A2 = FollowUpAgent(followup_engine=followup_engine)
-
-    print("\n--- Lider A creeaza un follow-up (pentru propriul contact) ---")
-    fu_A = followup_engine.create_from_trigger(lider_A, uuid4(), uuid4())
-    print("Follow-up creat pentru Lider A:", fu_A.id)
-
-    print("\n--- TEST NEGATIV: Lider B incearca sa finalizeze follow-up-ul lui A ---")
-    try:
-        followup_engine.complete_followup(fu_A.id, lider_B, confirmed=True)
-        print("!!! EROARE GRAVA: Lider B a putut finaliza follow-up-ul lui A !!!")
-        sys.exit(1)
-    except FollowUpAccessDeniedError:
-        print("OK: FollowUpAccessDeniedError — Lider B NU a putut accesa follow-up-ul lui A")
-
-    print("\n--- TEST NEGATIV: Lider B incearca sa amane follow-up-ul lui A (prin Agent) ---")
-    try:
-        agent_A2.request_postpone(fu_A.id, lider_B)
-        print("!!! EROARE GRAVA: Agent B a putut amana follow-up-ul lui A !!!")
-        sys.exit(1)
-    except FollowUpAccessDeniedError:
-        print("OK: refuzat corect, chiar si prin Agent")
-
-    print("\n--- Verificare pozitiva: Lider A ISI poate finaliza propriul follow-up ---")
-    fu_A = followup_engine.complete_followup(fu_A.id, lider_A, confirmed=True)
-    print("OK: Lider A a reusit, status =", fu_A.status)
+    def test_lider_b_isi_poate_modifica_propria_misiune(self):
+        """Verificare pozitiva: Lider B ISI poate modifica propria misiune, fara probleme."""
+        mission = self.mission_engine.assign_mission(self.mission_b.id, self.lider_b)
+        assert mission.status == "ASSIGNED"
 
 
-print()
-print("=" * 70)
-print("SECURITY ISOLATION AUDIT — TOATE TESTELE NEGATIVE AU TRECUT")
-print("Niciun lider nu poate actiona asupra datelor altui lider.")
-print("=" * 70)
+class TestFollowUpSecurityIsolation:
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.fake_db = FakeFollowUpDB()
+        self.lider_a = uuid4()
+        self.lider_b = uuid4()
+
+        self.patchers = [
+            patch("src.engines.rule.rule_engine.get_connection"),
+            patch("src.engines.followup.followup_engine.get_connection"),
+            patch("src.agents.followup.followup_agent.get_connection"),
+        ]
+        mocks = [p.start() for p in self.patchers]
+        for m in mocks:
+            m.return_value = make_conn(self.fake_db)
+
+        self.rule_engine = RuleEngine()
+        self.followup_engine = FollowUpEngine(rule_engine=self.rule_engine)
+        self.agent_a = FollowUpAgent(followup_engine=self.followup_engine)
+
+        self.fu_a = self.followup_engine.create_from_trigger(self.lider_a, uuid4(), uuid4())
+
+        yield
+
+        for p in self.patchers:
+            p.stop()
+
+    def test_lider_b_nu_poate_finaliza_followup_lui_a_direct(self):
+        """Prin Engine direct, Lider B nu poate finaliza follow-up-ul lui A."""
+        with pytest.raises(FollowUpAccessDeniedError):
+            self.followup_engine.complete_followup(self.fu_a.id, self.lider_b, confirmed=True)
+
+    def test_lider_b_nu_poate_amana_followup_lui_a_prin_agent(self):
+        """Nici prin Agent — Lider B nu acceseaza follow-up-ul lui A."""
+        with pytest.raises(FollowUpAccessDeniedError):
+            self.agent_a.request_postpone(self.fu_a.id, self.lider_b)
+
+    def test_lider_a_isi_poate_finaliza_propriul_followup(self):
+        """Verificare pozitiva: Lider A ISI poate finaliza propriul follow-up."""
+        followup = self.followup_engine.complete_followup(self.fu_a.id, self.lider_a, confirmed=True)
+        assert followup.status == "COMPLETED"
