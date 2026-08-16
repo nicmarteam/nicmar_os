@@ -84,19 +84,18 @@ class FollowUpAgent:
     # Confirmare umană / acțiuni — deleagă, nu scrie
     # ------------------------------------------------------------------
 
-    def confirm_completion(self, followup_id: UUID, confirmed: bool) -> FollowUp:
+    def confirm_completion(self, followup_id: UUID, owner_id: UUID, confirmed: bool) -> FollowUp:
         """
         Punctul de Human-in-the-loop: liderul confirmă că follow-up-ul
-        a fost realizat. Deleagă integral către
-        FollowUpEngine.complete_followup(), care rămâne singura cale
-        reală de tranziție.
+        a fost realizat. `owner_id` obligatoriu — verificat real de
+        FollowUpEngine (Security Isolation Audit, 12 august 2026).
         """
-        return self.followup_engine.complete_followup(followup_id, confirmed=confirmed)
+        return self.followup_engine.complete_followup(followup_id, owner_id, confirmed=confirmed)
 
-    def request_postpone(self, followup_id: UUID) -> FollowUp:
+    def request_postpone(self, followup_id: UUID, owner_id: UUID) -> FollowUp:
         """Liderul alege 'Amână' — deleagă către FollowUpEngine.postpone_followup()."""
-        return self.followup_engine.postpone_followup(followup_id)
+        return self.followup_engine.postpone_followup(followup_id, owner_id)
 
-    def request_reschedule(self, followup_id: UUID) -> FollowUp:
+    def request_reschedule(self, followup_id: UUID, owner_id: UUID) -> FollowUp:
         """Liderul alege 'Programăm un nou follow-up' — deleagă către FollowUpEngine."""
-        return self.followup_engine.reschedule_followup(followup_id)
+        return self.followup_engine.reschedule_followup(followup_id, owner_id)
