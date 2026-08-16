@@ -55,9 +55,12 @@ def decode_access_token(token: str) -> UUID:
     """
     Decodează un JWT, verifică semnătura și expirarea.
 
-    Ridică jwt.ExpiredSignatureError sau jwt.InvalidTokenError (sau
-    subclase, ex. InvalidSignatureError) — nu le capturăm aici,
-    apelantul (get_current_user) decide cum le mapează la HTTP.
+    Orice token cu semnătură validă dar claim ``sub`` lipsă, invalid
+    sau de tip neașteptat este normalizat la jwt.InvalidTokenError,
+    astfel încât stratul HTTP să răspundă cu 401, nu cu 500.
     """
     payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-    return UUID(payload["sub"])
+    try:
+        return UUID(payload["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise jwt.InvalidTokenError("Invalid token subject.") from exc
