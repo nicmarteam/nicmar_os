@@ -228,3 +228,43 @@ def test_full_http_flow_generate_to_complete(client):
     r6 = client.get("/api/v1/missions/dis-score", params={"owner_id": owner_id})
     assert r6.status_code == 200
     assert r6.json()["dis_score"] == 1.0
+
+
+class TestInvalidMissionIdReturns422:
+    """
+    Aliniere de comportament (12 august 2026): toate cele 4 endpoint-uri
+    cu mission_id in path folosesc acum UUID direct ca tip — FastAPI
+    valideaza automat si returneaza 422, nu mai crapa cu 500 pentru
+    un ID malformat.
+    """
+
+    INVALID_ID = "nu-e-un-uuid-valid"
+
+    def test_assign_invalid_id_returns_422(self, client):
+        owner_id = _create_user("invalid-assign")
+        response = client.post(
+            f"/api/v1/missions/{self.INVALID_ID}/assign", json={"owner_id": owner_id}
+        )
+        assert response.status_code == 422
+
+    def test_present_invalid_id_returns_422(self, client):
+        owner_id = _create_user("invalid-present")
+        response = client.get(
+            f"/api/v1/missions/{self.INVALID_ID}/present", params={"owner_id": owner_id}
+        )
+        assert response.status_code == 422
+
+    def test_start_invalid_id_returns_422(self, client):
+        owner_id = _create_user("invalid-start")
+        response = client.post(
+            f"/api/v1/missions/{self.INVALID_ID}/start",
+            json={"owner_id": owner_id, "confirmed": True},
+        )
+        assert response.status_code == 422
+
+    def test_complete_invalid_id_returns_422(self, client):
+        owner_id = _create_user("invalid-complete")
+        response = client.post(
+            f"/api/v1/missions/{self.INVALID_ID}/complete", json={"owner_id": owner_id}
+        )
+        assert response.status_code == 422
