@@ -105,9 +105,13 @@ Aceeași asimetrie găsită la Impact: `missions.scheduled_at` există în schem
 
 ## 6. Formula agregată — **TBD, nedecisă**
 
-Cele 4 componente (Impact, Timp, Încărcare, Urgență) au fost definite **individual**, dar modul lor de combinare într-un scor final de prioritate **nu a fost stabilit azi**:
-- Sumă ponderată? Produs? Ordine lexicografică (Impact primul, Timp ca tiebreaker)?
-- Încărcarea intră în formulă, sau rămâne filtru separat (v. secțiunea 4)?
+**Doar 3 componente intră în `PriorityScore`** — Încărcarea e deja decisă ca filtru post-scoring (secțiunea 4), nu componentă de scor.
+
+```
+PriorityScore = f(Impact, Timp, Urgență)
+```
+
+Modul exact de combinare **nu a fost stabilit azi**: Sumă ponderată? Produs? Ordine lexicografică (Impact primul, Timp ca tiebreaker)?
 
 **Nu se inventează această formulă acum** — rămâne următoarea decizie de business, separată.
 
@@ -135,7 +139,7 @@ Cele 4 componente (Impact, Timp, Încărcare, Urgență) au fost definite **indi
 
 1. **Mission e sistematic dezavantajat** față de FollowUp în Impact și Urgență, nu din decizie de business, ci din lipsă de date (`contact_id`, `scheduled_at` nesetate) — risc real de a subprioritiza Mission-uri, dacă formula agregată nu compensează
 2. **`CONVERTED = 0.0` bonus** poate fi interpretat greșit ca "valoare mică" dacă nu e documentat clar în UI/Dashboard — necesită atenție la implementare
-3. **Încărcarea și Urgența au 2 TBD-uri fiecare** (rol în agregare / praguri) — engine-ul nu poate fi complet fără ele
+3. **Urgența are pragurile numerice TBD. Încărcarea este decisă complet ca filtru post-scoring** — nu mai e un TBD, nu se redeschide.
 
 ---
 
@@ -147,6 +151,9 @@ Cele 4 componente (Impact, Timp, Încărcare, Urgență) au fost definite **indi
 - [ ] Timp: calculat corect din `state_history`, pentru toate 3 tipuri
 - [ ] Timp: gestionare corectă dacă entitatea nu e încă `COMPLETED` (fără eroare, valoare `None`/`TBD`)
 - [ ] Încărcare: numărătoare corectă, izolată per `owner_id` (verificare de securitate, ca la toate celelalte azi)
+- [ ] `PriorityScore` **nu folosește Încărcarea** — verificat explicit, nu presupus
+- [ ] Modificarea numărului de activități active **nu modifică scorul individual** al unei activități
+- [ ] Încărcarea afectează doar **numărul de activități selectate în Planul Zilei**, nu ordinea/scorul lor
 - [ ] Urgență: Mission/Partner → mereu `1.0`
 - [ ] Test de regresie: cele 115+ teste existente rămân verzi
 
@@ -154,10 +161,9 @@ Cele 4 componente (Impact, Timp, Încărcare, Urgență) au fost definite **indi
 
 ## 10. Următorul pas real
 
-**Nu cod încă.** Rămân 3 decizii de business explicite, separate, înainte de implementare:
+**Nu cod încă.** Rămân **2** decizii de business explicite, separate, înainte de implementare (Încărcarea e închisă, nu se redeschide):
 1. Pragurile numerice pentru Urgență (FollowUp)
-2. Rolul Încărcării în agregare (filtru vs. componentă de scor)
-3. Formula agregată finală (cum se combină Impact+Timp+Urgență[+Încărcare])
+2. Formula agregată finală — cum se combină `Impact + Timp + Urgență` într-un `PriorityScore`
 
 ---
 *Document canonic. Fiecare valoare din secțiunile 2-3 e verificată din cod/schemă reală. Fiecare TBD e marcat explicit, nu completat cu presupuneri.*
