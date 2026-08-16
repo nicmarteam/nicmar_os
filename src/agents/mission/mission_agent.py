@@ -81,21 +81,20 @@ class MissionAgent:
     # Confirmare umană — deleagă, nu scrie
     # ------------------------------------------------------------------
 
-    def confirm_and_start(self, mission_id: UUID, confirmed: bool) -> Mission:
+    def confirm_and_start(self, mission_id: UUID, owner_id: UUID, confirmed: bool) -> Mission:
         """
         Punctul de Human-in-the-loop: "Sunt gata, încep".
 
-        MissionAgent NU schimbă starea singur — deleagă integral
-        decizia și scrierea către MissionEngine.start_mission(), care
-        rămâne singura cale reală de tranziție (vezi mission_engine.py,
-        _set_status).
+        `owner_id` obligatoriu — transmis mai departe către
+        MissionEngine.start_mission(), care verifică real izolarea
+        (Security Isolation Audit, 12 august 2026).
         """
-        return self.mission_engine.start_mission(mission_id, confirmed=confirmed)
+        return self.mission_engine.start_mission(mission_id, owner_id, confirmed=confirmed)
 
-    def confirm_completion(self, mission_id: UUID) -> Mission:
+    def confirm_completion(self, mission_id: UUID, owner_id: UUID) -> Mission:
         """
         Marchează misiunea ca finalizată — deleagă complet către
         MissionEngine.complete_mission(), care persistă și DIS.
         MissionAgent nu calculează, nu scrie, doar deleagă.
         """
-        return self.mission_engine.complete_mission(mission_id)
+        return self.mission_engine.complete_mission(mission_id, owner_id)
