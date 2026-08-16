@@ -56,7 +56,7 @@ Necesită `state_history` pentru `Contact` (nu există azi — `Contact` are doa
 
 ---
 
-## 3. Timp v1 — DECIS, complet
+## 3. Timp v1 — ⚠️ PROPUS, necesită confirmare explicită
 
 ```
 Mission:   state_history(new_state='COMPLETED').created_at − missions.created_at
@@ -65,11 +65,11 @@ Partner:   events('PartnerInteractionCompleted').created_at
            − events('PartnerDiagnosticGenerated').created_at
 ```
 
-Toate 3 derivate din timestamp-uri deja scrise de codul existent — fără câmpuri noi, fără presupuneri.
+Toate 3 derivate din timestamp-uri deja scrise de codul existent — fără câmpuri noi, fără presupuneri. **Definiția e propusă de Claude, nu confirmată explicit de Nic** — rămâne deschisă până la confirmare, aceeași disciplină aplicată la Impact/Încărcare.
 
 ---
 
-## 4. Încărcare v1 — DECIS ca formulă, dar **rol în agregare = TBD**
+## 4. Încărcare v1 — ✅ DECIS complet (formulă + rol)
 
 ```
 Încărcare(owner_id) = COUNT(missions WHERE owner_id=X AND status IN
@@ -77,8 +77,14 @@ Toate 3 derivate din timestamp-uri deja scrise de codul existent — fără câm
                      + COUNT(follow_ups WHERE owner_id=X AND status='PENDING')
 ```
 
-### ⚠️ TBD — cum se folosește Încărcarea
-Sursa (`05`) sugerează că Încărcarea nu e o componentă per-activitate care se combină aditiv cu Impact/Timp/Urgență, ci mai degrabă un **filtru global** — *"Nu există mai mult de 3-5 acțiuni esențiale"* afișate odată. Rămâne de decis: Încărcarea limitează câte rezultate afișăm (post-scoring), sau influențează scorul fiecărei activități individual (pre-scoring)?
+### Rol în agregare — decis oficial
+**Încărcarea NU modifică `PriorityScore` al unei activități.** E filtru aplicat **după** sortare — determină câte activități din vârful listei intră în Planul Zilei, nu cum se calculează scorul fiecăreia.
+
+```
+Flux: Impact + Timp + Urgență → PriorityScore → sortare → filtru Încărcare → Planul Zilei (3-5 acțiuni)
+```
+
+**Motiv, din sursă**: *"Nu există mai mult de 3-5 acțiuni esențiale"* (plafon dur de afișare) + *"reduce încărcarea cognitivă"* (prin a arăta mai puțin, nu prin recalcularea scorului).
 
 ---
 
@@ -114,9 +120,9 @@ Cele 4 componente (Impact, Timp, Încărcare, Urgență) au fost definite **indi
 | Impact — Layer 1 (tip) | ✅ | — |
 | Impact — Layer 2 (context, doar FollowUp) | ✅ | — |
 | Impact — Layer 3 (progres real relație) | ❌ | ✅ (necesită `state_history` pentru Contact) |
-| Timp | ✅ | — |
+| Timp | ⚠️ propus, neconfirmat | — |
 | Încărcare (formulă) | ✅ | — |
-| Încărcare (rol în agregare) | ❌ TBD | — |
+| Încărcare (rol în agregare) | ✅ filtru post-scoring | — |
 | Urgență (concept + sursă date) | ✅ (doar FollowUp) | — |
 | Urgență (praguri numerice) | ❌ TBD | — |
 | Urgență pentru Mission/Partner | ❌ (valoare de bază) | ✅ (necesită `scheduled_at` populat real) |
