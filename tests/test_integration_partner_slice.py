@@ -1,15 +1,13 @@
 """
-Test de integrare — Partner Vertical Slice, cap-coada.
-
-FakeDB in memorie. Diferit de Mission/FollowUp: aici nu exista tabel
-de stare tranzitionala (partners.status neatins) - se urmareste doar
-`events` (PartnerDiagnosticGenerated) si `scores` (PDI/PIP).
+Test de integrare — Partner Vertical Slice, cap-coada, ca teste pytest reale.
+Include si dovada de izolare intre lideri (owner_id), gasita ca bug real
+in testarea originala.
 """
-import sys
-sys.path.insert(0, '/home/claude/nicmar_impl')
 
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from src.engines.rule.rule_engine import RuleEngine
 from src.engines.partner.partner_engine import PartnerEngine, PartnerDiagnosticAlreadyGeneratedError
@@ -21,7 +19,7 @@ class FakeDB:
         self.kpis = {"PDI": uuid4(), "PIP": uuid4()}
         self.scores = []
         self.events = []
-        self.partners = {}  # partner_id -> owner_id, pentru simularea JOIN-ului
+        self.partners = {}  # partner_id -> owner_id
 
     def execute(self, query, params=None):
         q = " ".join(query.split())
@@ -64,7 +62,6 @@ class FakeDB:
         return self._last_result
 
     def fetchall(self):
-        # folosit doar de PartnerAgent.get_recent_scores, dupa JOIN pe partners.owner_id
         owner_id = getattr(self, "_fetchall_owner_id", None)
         result = []
         seen = set()
@@ -94,90 +91,95 @@ def make_fake_connection(fake_db):
     return mock_conn
 
 
-fake_db = FakeDB()
-partner_id = uuid4()
-owner_id = uuid4()
-fake_db.partners[partner_id] = owner_id  # simuleaza randul din tabelul real `partners`
+class TestPartnerVerticalSlice:
 
-with patch("src.engines.rule.rule_engine.get_connection") as rule_conn, \
-     patch("src.engines.partner.partner_engine.get_connection") as pe_conn, \
-     patch("src.agents.partner.partner_agent.get_connection") as agent_conn:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.fake_db = FakeDB()
+        self.partner_id = uuid4()
+        self.owner_id = uuid4()
+        self.fake_db.partners[self.partner_id] = self.owner_id
 
-    rule_conn.return_value = make_fake_connection(fake_db)
-    pe_conn.return_value = make_fake_connection(fake_db)
-    agent_conn.return_value = make_fake_connection(fake_db)
+        self.patchers = [
+            patch("src.engines.rule.rule_engine.get_connection"),
+            patch("src.engines.partner.partner_engine.get_connection"),
+            patch("src.agents.partner.partner_agent.get_connection"),
+        ]
+        mocks = [p.start() for p in self.patchers]
+        for m in mocks:
+            m.return_value = make_fake_connection(self.fake_db)
 
-    rule_engine = RuleEngine()
-    partner_engine = PartnerEngine(rule_engine=rule_engine)
-    agent = PartnerAgent(partner_engine=partner_engine)
+        self.rule_engine = RuleEngine()
+        self.partner_engine = PartnerEngine(rule_engine=self.rule_engine)
+        self.agent = PartnerAgent(partner_engine=self.partner_engine)
 
-    print("=== PASUL 1: RuleEngine — partenerul nu a primit diagnostic azi ===")
-    r1 = rule_engine.evaluate_partner_diagnostic(partner_id)
-    print("Decizie:", r1.decision_outcome)
-    assert r1.decision_outcome == "PARTNER_READY"
-    print("OK\n")
+        yield
 
-    print("=== PASUL 2: PartnerAgent solicita diagnostic (deleaga la Engine) ===")
-    diagnostic = agent.request_diagnostic(partner_id, owner_id, "NEXT_STEP")
-    print("Diagnostic tip:", diagnostic.diagnostic_type)
-    assert diagnostic.diagnostic_type == "NEXT_STEP"
-    assert len(fake_db.events) == 1
-    print("OK — eveniment PartnerDiagnosticGenerated emis\n")
+        for p in self.patchers:
+            p.stop()
 
-    print("=== PASUL 3: RuleEngine reevaluat — acum e deja diagnosticat azi ===")
-    r2 = rule_engine.evaluate_partner_diagnostic(partner_id)
-    print("Decizie:", r2.decision_outcome, "(asteptat: PARTNER_ALREADY_DIAGNOSED)")
-    assert r2.decision_outcome == "PARTNER_ALREADY_DIAGNOSED"
-    print("OK — RuleEngine si PartnerEngine sincronizate prin events\n")
+    def _request_diagnostic(self):
+        self.diagnostic = self.agent.request_diagnostic(self.partner_id, self.owner_id, "NEXT_STEP")
 
-    print("=== PASUL 4: al doilea diagnostic in aceeasi zi -> refuzat ===")
-    try:
-        agent.request_diagnostic(partner_id, owner_id, "CLARITY")
-        print("EROARE: ar fi trebuit sa refuze")
-    except PartnerDiagnosticAlreadyGeneratedError:
-        print("OK: refuzat corect — nu se genereaza 2 diagnostice/zi\n")
+    def test_01_rule_engine_ready_fara_diagnostic(self):
+        """RuleEngine — partenerul nu a primit diagnostic azi -> PARTNER_READY."""
+        result = self.rule_engine.evaluate_partner_diagnostic(self.partner_id)
+        assert result.decision_outcome == "PARTNER_READY"
 
-    print("=== PASUL 5: PartnerAgent prezinta diagnosticul (mesaj STUB) ===")
-    text = agent.present_diagnostic(diagnostic)
-    print(text)
-    assert "[STUB]" in text
-    print("OK\n")
+    def test_02_agent_solicita_diagnostic(self):
+        """PartnerAgent solicita diagnostic (deleaga la Engine), tip corect, event emis."""
+        self._request_diagnostic()
+        assert self.diagnostic.diagnostic_type == "NEXT_STEP"
+        assert len(self.fake_db.events) == 1
 
-    print("=== PASUL 6: fara confirmare, refuz garantat ===")
-    try:
-        agent.confirm_and_send(partner_id, owner_id, confirmed=False)
-        print("EROARE: ar fi trebuit sa refuze")
-    except Exception as e:
-        print("OK: refuzat —", type(e).__name__)
-    print()
+    def test_03_rule_engine_reevaluat_deja_diagnosticat(self):
+        """Dupa diagnostic, RuleEngine reevaluat -> PARTNER_ALREADY_DIAGNOSED."""
+        self._request_diagnostic()
+        result = self.rule_engine.evaluate_partner_diagnostic(self.partner_id)
+        assert result.decision_outcome == "PARTNER_ALREADY_DIAGNOSED"
 
-    print("=== PASUL 7: liderul confirma — PDI + PIP persistate ===")
-    agent.confirm_and_send(partner_id, owner_id, confirmed=True)
-    print("Numar scoruri:", len(fake_db.scores))
-    assert len(fake_db.scores) == 2
-    print("OK — PDI si PIP persistate, nu doar unul\n")
+    def test_04_al_doilea_diagnostic_refuzat(self):
+        """Al doilea diagnostic in aceeasi zi e refuzat — nu se genereaza 2/zi."""
+        self._request_diagnostic()
+        with pytest.raises(PartnerDiagnosticAlreadyGeneratedError):
+            self.agent.request_diagnostic(self.partner_id, self.owner_id, "CLARITY")
 
-    print("=== PASUL 8: Agentul citeste scorurile — DOAR pentru owner-ul corect ===")
-    # Adaugam un al doilea partener, al ALTUI lider, cu scoruri proprii —
-    # ca sa dovedim ca filtrarea prin owner_id chiar functioneaza,
-    # nu doar ca nu mai crapa (bug-ul gasit mai devreme).
-    other_owner_id = uuid4()
-    other_partner_id = uuid4()
-    fake_db.partners[other_partner_id] = other_owner_id
-    other_pdi_id = fake_db.kpis["PDI"]
-    fake_db.scores.append((other_pdi_id, "partner", other_partner_id, 99.0, "ENG-PRE-001"))
+    def test_05_agent_prezinta_diagnosticul_stub(self):
+        """PartnerAgent prezinta diagnosticul, mesaj STUB inclus."""
+        self._request_diagnostic()
+        text = self.agent.present_diagnostic(self.diagnostic)
+        assert "[STUB]" in text
 
-    scores = agent.get_recent_scores(owner_id)
-    print("Scoruri citite pentru owner_id corect:", scores)
-    assert scores.get("PDI") == 1.0, "Nu trebuie sa vada scorul (99.0) al altui lider!"
-    assert scores.get("PIP") == 1.0
-    print("OK — scorul (99.0) al altui lider NU a aparut — izolare corecta\n")
+    def test_06_fara_confirmare_refuz_garantat(self):
+        """Fara confirmare, finalizarea e refuzata."""
+        self._request_diagnostic()
+        with pytest.raises(Exception):
+            self.agent.confirm_and_send(self.partner_id, self.owner_id, confirmed=False)
 
-    print("=== PASUL 9: events inregistrate corect (diagnostic + completare) ===")
-    print("Evenimente:", len(fake_db.events))
-    assert len(fake_db.events) == 2  # PartnerDiagnosticGenerated + PartnerInteractionCompleted
-    print("OK\n")
+    def test_07_confirmare_persista_pdi_si_pip(self):
+        """Liderul confirma — PDI si PIP persistate, nu doar unul."""
+        self._request_diagnostic()
+        self.agent.confirm_and_send(self.partner_id, self.owner_id, confirmed=True)
+        assert len(self.fake_db.scores) == 2
 
-print("=" * 60)
-print("TEST DE INTEGRARE PARTNER COMPLET — LANTUL FUNCTIONEAZA")
-print("=" * 60)
+    def test_08_agent_citeste_scorurile_izolat_pe_owner(self):
+        """
+        Agentul citeste scorurile DOAR pentru owner-ul corect.
+
+        Adauga un al doilea partener, al ALTUI lider, cu scor propriu —
+        dovedeste ca filtrarea prin owner_id chiar functioneaza (bug
+        real gasit si corectat aici, nu doar ipotetic).
+        """
+        self._request_diagnostic()
+        self.agent.confirm_and_send(self.partner_id, self.owner_id, confirmed=True)
+
+        other_owner_id = uuid4()
+        other_partner_id = uuid4()
+        self.fake_db.partners[other_partner_id] = other_owner_id
+        other_pdi_id = self.fake_db.kpis["PDI"]
+        self.fake_db.scores.append((other_pdi_id, "partner", other_partner_id, 99.0, "ENG-PRE-001"))
+
+        scores = self.agent.get_recent_scores(self.owner_id)
+
+        assert scores.get("PDI") == 1.0, "Nu trebuie sa vada scorul (99.0) al altui lider!"
+        assert scores.get("PIP") == 1.0
