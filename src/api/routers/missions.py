@@ -1,13 +1,16 @@
 """
-Router Mission — API, sursă: 14-api-contract.md, secțiunea 3.
+Router Mission — API, sursă: 14-api-contract.md, secțiunea 3, integrat
+cu Auth (12 august 2026).
 
-Fiecare endpoint apelează exclusiv MissionAgent (nu MissionEngine
-direct din endpoint, cu o singură excepție justificată: POST /missions,
-care generează — MissionAgent nu are metodă de generare, verificat
-în contract, secțiunea 3).
+SCHIMBARE DE SECURITATE: owner_id NU mai vine din request (body/query).
+Vine exclusiv din get_current_user() — orice owner_id trimis manual de
+client e ignorat complet, fiindcă nu mai există câmpul owner_id în
+schemele de request (CreateMissionRequest, StartMissionRequest) sau
+în semnăturile endpoint-urilor (present, dis-score).
 
-owner_id vine explicit din request (secțiunea 0 din contract —
-limitare temporară, până la Auth).
+Engine-urile rămân neschimbate — primesc owner_id explicit, ca
+parametru Python, exact ca înainte. Doar sursa lui s-a schimbat:
+current_user.id (derivat din JWT), nu din request.
 """
 
 from uuid import UUID
@@ -16,9 +19,10 @@ from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_mission_agent, get_mission_engine
 from src.api.schemas import (
-    CreateMissionRequest, AssignMissionRequest, MissionResponse, StartMissionRequest,
-    CompleteMissionRequest, PresentMissionResponse, DisScoreResponse,
+    CreateMissionRequest, MissionResponse, StartMissionRequest, PresentMissionResponse,
+    DisScoreResponse,
 )
+from src.auth.dependencies import get_current_user, CurrentUser
 from src.agents.mission.mission_agent import MissionAgent
 from src.engines.mission.mission_engine import MissionEngine
 
@@ -35,40 +39,37 @@ def _to_response(mission) -> MissionResponse:
 @router.post("", response_model=MissionResponse, status_code=201)
 def create_mission(
     body: CreateMissionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     mission_engine: MissionEngine = Depends(get_mission_engine),
 ):
-    """Generează o misiune nouă — apelează MissionEngine direct (fără metodă Agent de generare)."""
-    mission = mission_engine.generate_mission(body.owner_id, body.title)
+    """Generează o misiune pentru utilizatorul autentificat curent."""
+    mission = mission_engine.generate_mission(current_user.id, body.title)
     return _to_response(mission)
 
 
 @router.post("/{mission_id}/assign", response_model=MissionResponse)
 def assign_mission(
     mission_id: UUID,
-    body: AssignMissionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     mission_engine: MissionEngine = Depends(get_mission_engine),
 ):
     """
-    GENERATED -> ASSIGNED. Apelează MissionEngine direct — nu există
-    metodă Agent pentru assign (verificat: MissionAgent nu are
-    assign_mission, doar confirm_and_start/confirm_completion).
-    Nu necesită confirmed — GENERATED -> ASSIGNED nu e punct de HITL
-    (verificat în docstring-ul metodei: "fără confirmare umană
-    necesară aici, afișare în Dashboard").
+    GENERATED -> ASSIGNED. Fără body — nu mai are nevoie de owner_id
+    din request, doar din identitatea autentificată.
     """
-    mission = mission_engine.assign_mission(mission_id, body.owner_id)
+    mission = mission_engine.assign_mission(mission_id, current_user.id)
     return _to_response(mission)
 
 
 @router.get("/{mission_id}/present", response_model=PresentMissionResponse)
 def present_mission(
     mission_id: UUID,
-    owner_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
     mission_agent: MissionAgent = Depends(get_mission_agent),
     mission_engine: MissionEngine = Depends(get_mission_engine),
 ):
-    """Citește misiunea, apoi cere Agentului textul de prezentare."""
-    mission = mission_engine.get_mission(mission_id, UUID(owner_id))
+    """Citește misiunea utilizatorului autentificat, apoi cere Agentului textul."""
+    mission = mission_engine.get_mission(mission_id, current_user.id)
     text = mission_agent.present_daily_mission(mission)
     return PresentMissionResponse(text=text)
 
@@ -77,29 +78,30 @@ def present_mission(
 def start_mission(
     mission_id: UUID,
     body: StartMissionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     mission_agent: MissionAgent = Depends(get_mission_agent),
 ):
-    """Confirmare umană — 'Sunt gata, încep' — deleagă la MissionAgent."""
-    mission = mission_agent.confirm_and_start(mission_id, body.owner_id, confirmed=body.confirmed)
+    """Confirmare umană — 'Sunt gata, încep' — owner_id din identitate, nu din body."""
+    mission = mission_agent.confirm_and_start(mission_id, current_user.id, confirmed=body.confirmed)
     return _to_response(mission)
 
 
 @router.post("/{mission_id}/complete", response_model=MissionResponse)
 def complete_mission(
     mission_id: UUID,
-    body: CompleteMissionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     mission_agent: MissionAgent = Depends(get_mission_agent),
 ):
-    """Finalizare — deleagă la MissionAgent, care persistă și DIS."""
-    mission = mission_agent.confirm_completion(mission_id, body.owner_id)
+    """Finalizare — fără body, owner_id din identitatea autentificată."""
+    mission = mission_agent.confirm_completion(mission_id, current_user.id)
     return _to_response(mission)
 
 
 @router.get("/dis-score", response_model=DisScoreResponse)
 def get_dis_score(
-    owner_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
     mission_agent: MissionAgent = Depends(get_mission_agent),
 ):
-    """READ-ONLY — citește ultimul scor DIS al owner-ului."""
-    score = mission_agent.get_recent_dis_score(UUID(owner_id))
+    """READ-ONLY — scorul DIS al utilizatorului autentificat, nu al unui owner_id arbitrar."""
+    score = mission_agent.get_recent_dis_score(current_user.id)
     return DisScoreResponse(dis_score=score)
