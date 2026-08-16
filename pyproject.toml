@@ -1,0 +1,31 @@
+[project]
+name = "nicmar-os"
+version = "0.1.0"
+description = "NicMar OS — sistemul de operare AI pentru liderii Metodei NicMar"
+requires-python = ">=3.10"
+
+dependencies = [
+    # Folosit direct de src/data/db.py, src/engines/*, tot lantul
+    # Rule -> Engine -> Data -> Agent testat azi (Mission, FollowUp, Partner).
+    "psycopg[binary]>=3.1",
+    # Folosite de src/llm/provider_factory.py (existent inainte de
+    # vertical slice-urile de azi) — neinvocate de tests/, dar parte
+    # reala a codului din repo, nu inventate aici.
+    "google-genai",
+    "openai",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Versiunea testata azi la refactorizarea celor 9 fisiere de test.
+    "pytest>=7.0",
+]
+
+# ------------------------------------------------------------------
+# Configurare pytest — "pytest -v" ruleaza direct din radacina
+# repo-ului, fara sys.path.insert manual in fiecare fisier de test.
+# ------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v"
