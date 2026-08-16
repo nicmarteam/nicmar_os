@@ -103,12 +103,25 @@ O activitate `COMPLETED`/`POSTPONED`/`RESCHEDULED` **nu apare niciodată** în o
 ## 7. Filtrul de Încărcare — separat de scoring
 
 ```python
-apply_workload_filter(sorted_activities: List[PrioritizedActivity], owner_id: UUID) -> List[PrioritizedActivity]
+apply_workload_filter(sorted_activities: List[PrioritizedActivity]) -> List[PrioritizedActivity]
 ```
 
-Aplicat **după** sortare, niciodată în interiorul calculului `PriorityKey`. Trunchiază la primele **3-5** din lista deja sortată — pragul exact (3 vs. 5) rămâne parametru, nu hardcodat la o singură valoare (sursa spune "3-5", nu un număr fix).
+Aplicat **după** sortare, niciodată în interiorul calculului `PriorityKey`.
 
-**Decizie de implementare, nu de business**: propun `min(5, max(3, ...))` bazat pe numărul total de activități disponibile (dacă owner are doar 2 active, afișăm 2, nu forțăm 3) — **de confirmat înainte de cod**, nu implicit.
+### Regulă exactă, fără formulă inventată
+```
+Planul Zilei = până la 5 activități prioritare (primele din lista deja sortată),
+               cu obiectivul operațional de 3-5 atunci când există suficiente activități eligibile.
+```
+
+**Comportament, caz cu caz, verificat — nu dedus dintr-o formulă:**
+- 5+ activități disponibile → afișăm exact **5** (plafon dur)
+- 4 disponibile → afișăm **4**
+- 3 disponibile → afișăm **3**
+- 1-2 disponibile → afișăm **cele disponibile** (1 sau 2)
+- 0 disponibile → **listă goală**
+
+Implementare: `sorted_activities[:5]` — atât. **Niciun `min`/`max` artificial, niciun plafon minim forțat** — sursa spune "3-5 acțiuni esențiale", nu "minimum 3, chiar dacă nu există"; a forța un minim de 3 când owner-ul are doar 1 activitate eligibilă ar însemna să inventăm activități care nu există.
 
 ---
 
@@ -154,4 +167,4 @@ Fără agent dedicat în v1 — consumat direct de API-ul viitor sau de un `Prio
 - [ ] Regresie completă: cele 115+ teste existente rămân verzi
 
 ---
-*Contract verificat față de `18` (specificație de decizie) și codul real (`missions`/`follow_ups`/`contacts` schema, `MissionEngine`/`FollowUpEngine` pattern). O singură decizie de implementare deschisă (secțiunea 7, pragul exact 3-5) — de confirmat înainte de cod.*
+*Contract verificat față de `18` (specificație de decizie) și codul real (`missions`/`follow_ups`/`contacts` schema, `MissionEngine`/`FollowUpEngine` pattern). Zero decizii de business deschise — Partner exclus (confirmat), Planul Zilei fără formulă inventată (confirmat, `sorted_activities[:5]`). Executabil conceptual complet.*
