@@ -112,7 +112,25 @@ class ContactSummary:
     converted_to: Optional[str]          # "client" | "partner" | None
     pdi: Optional[float]                 # doar daca converted_to == "partner"
     pip: Optional[float]                 # doar daca converted_to == "partner"
+    reason: str                          # motiv scurt, derivat din grupul de prioritate
 ```
+
+### 5.1 `reason` — CONFIRMAT explicit de owner (17 august 2026), corectură a inconsistenței interne a contractului
+
+Descoperire de audit: secțiunea 0 a acestui contract promitea deja "un motiv scurt pentru fiecare" (aliniat cu `08-MVP-AGENT-001.md`), dar `ContactSummary` inițial nu avea acest câmp — inconsistență internă, nu doar diferență față de `08`. Corectată aici.
+
+**`reason` nu calculează nimic nou și nu modifică `PriorityKey`/sortarea** — e strict explicația textuală a grupului deja calculat de `_priority_group()`. Regula CONFIRMATĂ:
+
+```
+Grup 0 (FollowUp scadent)              → "Follow-up scadent"
+Grup 1 (fără niciun FollowUp)          → "Fără follow-up programat"
+Grup 2 (restul), sub-caz FollowUp
+    PENDING dar programat în viitor    → "Fără follow-up scadent"
+Grup 2 (restul), orice alt caz
+    (COMPLETED/POSTPONED/RESCHEDULED)  → "Prioritate după actualizare"
+```
+
+Notă de interpretare, semnalată explicit: regula confirmată de owner distinge textual 4 cazuri, deși `PriorityKey` are doar 3 grupuri numerice (0/1/2) — grupul 2 ("restul") se împarte în două formulări diferite după caz, fără să schimbe poziția în sortare. Motivul practic al distincției: „fără follow-up scadent" (există un FollowUp viitor programat) e o informație diferită pentru lider față de „prioritate după actualizare" (nu există niciun FollowUp activ relevant).
 
 **Regula de sortare v1 — CONFIRMATĂ explicit de owner (17 august 2026), nu doar propusă:**
 ```
@@ -161,17 +179,17 @@ Fără engine dedicat (`ContactEngine`) în v1 — motiv: agentul nu scrie nimic
 
 ## 9. Criterii de acceptare și teste obligatorii înainte de cod finalizat
 
-- [ ] `list_prioritized_contacts(owner_id)` returnează doar contacte ale `owner_id`-ului cerut — test de izolare cu 2 lideri (tiparul `test_security_isolation.py`)
-- [ ] Contacte `ARCHIVED` nu apar niciodată în output
-- [ ] Regula de sortare (secțiunea 5): follow-up scadent înaintea celor fără follow-up, înaintea restului — testat cu date explicite pentru toate cele 3 grupuri
-- [ ] Contact fără niciun `follow_up` → `last_followup_at=None`, fără eroare
-- [ ] Contact `CONVERTED` cu rând în `clients` → `converted_to="client"`, `pdi`/`pip`=`None`
-- [ ] Contact `CONVERTED` cu rând în `partners` → `converted_to="partner"`, `pdi`/`pip` populate dacă există în `scores`, altfel `None`
-- [ ] Contact `CONVERTED` fără rând nici în `clients`, nici în `partners` (caz de date inconsistente) → `converted_to=None`, fără crash — tratat explicit, nu excepție ascunsă
-- [ ] `owner_id` fără niciun contact → listă goală `[]`, nu eroare
-- [ ] Niciun apel SQL nu scrie — verificat prin test care confirmă că starea DB e neschimbată după apel
-- [ ] PostgreSQL real: test de integrare stateful, tiparul `test_integration_partner_slice.py`
-- [ ] Regresie completă: toate testele existente (115+, confirmate în `19`) rămân verzi
+- [x] `list_prioritized_contacts(owner_id)` returnează doar contacte ale `owner_id`-ului cerut — test de izolare cu 2 lideri (tiparul `test_security_isolation.py`) — verificat mock + PostgreSQL real
+- [x] Contacte `ARCHIVED` nu apar niciodată în output — verificat mock + PostgreSQL real
+- [x] Regula de sortare (secțiunea 5): follow-up scadent înaintea celor fără follow-up, înaintea restului — testat cu date explicite pentru toate cele 3 grupuri, mock + PostgreSQL real
+- [x] Contact fără niciun `follow_up` → `last_followup_at=None`, fără eroare
+- [x] Contact `CONVERTED` cu rând în `clients` → `converted_to="client"`, `pdi`/`pip`=`None`
+- [x] Contact `CONVERTED` cu rând în `partners` → `converted_to="partner"`, `pdi`/`pip` populate **per Partener individual** (corectură secțiunea 3.1) dacă există în `scores`, altfel `None`
+- [x] Contact `CONVERTED` fără rând nici în `clients`, nici în `partners` (caz de date inconsistente) → `converted_to=None`, fără crash — verificat mock + PostgreSQL real (17 august 2026); comportament corect prin logica SQL `CASE` existentă, nu a fost nevoie de cod nou
+- [x] `owner_id` fără niciun contact → listă goală `[]`, nu eroare
+- [x] Niciun apel SQL nu scrie — verificat prin test care confirmă `INSERT`/`UPDATE`/`DELETE` absente din toate interogările
+- [x] PostgreSQL real: test de integrare stateful, `TestContactAgentOnRealPostgres` în `test_real_postgres.py` (6 teste, toate GREEN)
+- [x] Regresie completă: **162/162** teste ale întregului repo rămân verzi (confirmat local, PostgreSQL 16, 17 august 2026 — actualizat după adăugarea `reason` și a testului pentru `CONVERTED` fără `clients`/`partners`; număr inițial 115+ reflecta starea dinaintea adăugării ContactAgent)
 
 ---
 
