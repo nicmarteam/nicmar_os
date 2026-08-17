@@ -1,20 +1,25 @@
 """
 Teste unitare pentru ContactAgent — cu mock, fara DB reala.
 
-Sursa: 20-contact-agent-contract.md, sectiunile 5 (regula de sortare,
-CONFIRMATA de owner 17 august 2026) si 9 (criterii de acceptare).
+Sursa: 20-contact-agent-contract.md, sectiunile 3.1 (corectura de
+granularitate PDI/PIP, CONFIRMATA 17 august 2026), 5 (regula de
+sortare, CONFIRMATA de owner 17 august 2026) si 9 (criterii de
+acceptare).
 
-RED intentionat: src/agents/contact/contact_agent.py NU exista inca.
-Aceste teste trebuie sa esueze la colectare (ImportError) pana la
-scrierea codului minim care le face sa treaca (GREEN).
+RED intentionat initial: src/agents/contact/contact_agent.py NU exista
+inca la prima rulare a acestui fisier. Dupa GREEN, fisierul a fost
+extins (RED->GREEN a doua oara) cand a fost descoperit bug-ul de
+granularitate PDI/PIP (agregat pe owner_id in loc de per Partener
+individual) — v. test_pdi_pip_per_partener_individual_nu_agregat_pe_owner.
 
 Forma datelor asumata pentru get_connection (decizie de implementare,
 nu de business logic - nu necesita reconfirmare separata):
     Query principal intoarce randuri:
         (contact_id, full_name, status, last_followup_at,
-         last_followup_status, converted_to, updated_at)
+         last_followup_status, converted_to, updated_at, partner_id)
     Query secundar (doar pentru contactele converted_to == "partner")
-    intoarce scoruri PDI/PIP, acelasi tipar ca PartnerAgent.get_recent_scores.
+    intoarce scoruri PDI/PIP PER PARTENER:
+        (partner_id, metric_code, score_value)
 """
 
 from datetime import datetime, timedelta, timezone
@@ -129,8 +134,8 @@ def test_list_prioritized_contacts_exclude_archived(agent):
     owner_id = uuid4()
 
     rows = [
-        (contact_id_active, "Ana Pop", "ACTIVE", None, None, None, NOW),
-        (contact_id_archived, "Ion Vechi", "ARCHIVED", None, None, None, NOW),
+        (contact_id_active, "Ana Pop", "ACTIVE", None, None, None, NOW, None),
+        (contact_id_archived, "Ion Vechi", "ARCHIVED", None, None, None, NOW, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -160,8 +165,8 @@ def test_sortare_followup_scadent_inaintea_celor_fara_followup(agent):
     rows = [
         # Contact fara followup listat primul in randurile brute,
         # dar trebuie sa apara AL DOILEA in rezultat (dupa sortare).
-        (contact_fara_followup, "Maria Ionescu", "ACTIVE", None, None, None, NOW),
-        (contact_scadent, "Vasile Pop", "ACTIVE", PAST, "PENDING", None, NOW),
+        (contact_fara_followup, "Maria Ionescu", "ACTIVE", None, None, None, NOW, None),
+        (contact_scadent, "Vasile Pop", "ACTIVE", PAST, "PENDING", None, NOW, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -185,8 +190,8 @@ def test_sortare_fara_followup_inaintea_restului(agent):
     contact_followup_completat = uuid4()
 
     rows = [
-        (contact_followup_completat, "Radu Stan", "ACTIVE", PAST, "COMPLETED", None, NOW),
-        (contact_fara_followup, "Elena Marin", "ACTIVE", None, None, None, NOW),
+        (contact_followup_completat, "Radu Stan", "ACTIVE", PAST, "COMPLETED", None, NOW, None),
+        (contact_fara_followup, "Elena Marin", "ACTIVE", None, None, None, NOW, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -209,8 +214,8 @@ def test_sortare_followup_viitor_nu_e_scadent(agent):
     contact_viitor = uuid4()
 
     rows = [
-        (contact_viitor, "Dan Ilie", "ACTIVE", FUTURE, "PENDING", None, NOW),
-        (contact_scadent, "Ioana Rusu", "ACTIVE", PAST, "PENDING", None, NOW),
+        (contact_viitor, "Dan Ilie", "ACTIVE", FUTURE, "PENDING", None, NOW, None),
+        (contact_scadent, "Ioana Rusu", "ACTIVE", PAST, "PENDING", None, NOW, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -230,8 +235,8 @@ def test_sortare_restul_dupa_updated_at_desc(agent):
     contact_recent = uuid4()
 
     rows = [
-        (contact_vechi, "Costin Voicu", "ACTIVE", PAST, "COMPLETED", None, PAST),
-        (contact_recent, "Bianca Toma", "ACTIVE", PAST, "COMPLETED", None, NOW),
+        (contact_vechi, "Costin Voicu", "ACTIVE", PAST, "COMPLETED", None, PAST, None),
+        (contact_recent, "Bianca Toma", "ACTIVE", PAST, "COMPLETED", None, NOW, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -255,7 +260,7 @@ def test_converted_client_nu_are_pdi_pip(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Client Nou", "CONVERTED", None, None, "client", NOW),
+        (contact_id, "Client Nou", "CONVERTED", None, None, "client", NOW, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -278,14 +283,15 @@ def test_converted_partner_fara_scor_persistat_ramane_none(agent):
     """
     owner_id = uuid4()
     contact_id = uuid4()
+    partner_id = uuid4()
 
     rows = [
-        (contact_id, "Partener Nou", "CONVERTED", None, None, "partner", NOW),
+        (contact_id, "Partener Nou", "CONVERTED", None, None, "partner", NOW, partner_id),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
-        mock_cur = _make_cursor(fetchall_return=rows)
-        # A doua interogare (scoruri PDI/PIP) - fara randuri, deci None.
+        mock_cur = _make_cursor(fetchall_return=None)
+        # A doua interogare (scoruri PDI/PIP per Partener) - fara randuri.
         mock_cur.fetchall.side_effect = [rows, []]
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -301,11 +307,12 @@ def test_converted_partner_cu_scor_persistat_populeaza_pdi_pip(agent):
     """Contact Partner CU scor real in scores -> pdi/pip populate corect."""
     owner_id = uuid4()
     contact_id = uuid4()
+    partner_id = uuid4()
 
     contact_rows = [
-        (contact_id, "Partener Activ", "CONVERTED", None, None, "partner", NOW),
+        (contact_id, "Partener Activ", "CONVERTED", None, None, "partner", NOW, partner_id),
     ]
-    score_rows = [("PDI", 1.0), ("PIP", 1.0)]
+    score_rows = [(partner_id, "PDI", 1.0), (partner_id, "PIP", 1.0)]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
         mock_cur = _make_cursor(fetchall_return=None)
@@ -320,7 +327,58 @@ def test_converted_partner_cu_scor_persistat_populeaza_pdi_pip(agent):
 
 
 # ----------------------------------------------------------------------
-# CRH nu este citit niciodata (contract, sectiunea 3 si 6 din audit)
+# CORECTURA DE GRANULARITATE (contract, sectiunea 3.1, CONFIRMATA
+# 17 august 2026) - testul critic: doi Parteneri ai aceluiasi owner
+# trebuie sa primeasca FIECARE scorul propriu, nu cel mai recent
+# scor agregat al owner-ului.
+# ----------------------------------------------------------------------
+
+
+def test_pdi_pip_per_partener_individual_nu_agregat_pe_owner(agent):
+    """
+    Bug corectat: doi Parteneri ai aceluiasi owner, cu scoruri PDI
+    diferite - fiecare Contact trebuie sa primeasca scorul PROPRIULUI
+    Partener, nu cel mai recent scor din toti Partenerii owner-ului.
+
+    Scenariu exact confirmat:
+        Partner A -> PDI 10
+        Partner B -> PDI 90
+        Contact A (convertit in Partner A) -> trebuie sa primeasca 10
+        Contact B (convertit in Partner B) -> trebuie sa primeasca 90
+    """
+    owner_id = uuid4()
+    contact_a = uuid4()
+    contact_b = uuid4()
+    partner_a = uuid4()
+    partner_b = uuid4()
+
+    contact_rows = [
+        (contact_a, "Contact A", "CONVERTED", None, None, "partner", NOW, partner_a),
+        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b),
+    ]
+    # Ordinea intentionat "inversata" fata de contacte, ca sa dovedim ca
+    # maparea se face explicit prin partner_id, nu prin ordinea randurilor.
+    score_rows = [
+        (partner_b, "PDI", 90.0),
+        (partner_a, "PDI", 10.0),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=None)
+        mock_cur.fetchall.side_effect = [contact_rows, score_rows]
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary_a = next(c for c in result if c.contact_id == contact_a)
+    summary_b = next(c for c in result if c.contact_id == contact_b)
+
+    assert summary_a.pdi == 10.0
+    assert summary_b.pdi == 90.0
+
+
+# ----------------------------------------------------------------------
+# CRH nu este citit niciodata (contract, sectiunea 3.1 si audit)
 # ----------------------------------------------------------------------
 
 
