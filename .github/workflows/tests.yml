@@ -55,5 +55,8 @@ jobs:
       - name: Rulare migrație — credențiale Auth
         run: psql "$DATABASE_URL" -f migrations/003_auth_credentials.sql
 
+      - name: Rulare migrație — coloane răspuns obiecție
+        run: psql "$DATABASE_URL" -f migrations/004_objection_response_columns.sql
+
       - name: Rulare pytest — unitare + integrare + securitate + PostgreSQL real
         run: pytest -v
