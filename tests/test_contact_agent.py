@@ -398,3 +398,140 @@ def test_nicio_interogare_nu_citeste_crh(agent):
             params = call[0][1] if len(call[0]) > 1 else ()
             assert "CRH" not in sql
             assert "CRH" not in params
+
+
+# ----------------------------------------------------------------------
+# `reason` — motiv textual per Contact (contract sectiunea 5.1,
+# CONFIRMAT de owner 17 august 2026). Nu recalculeaza PriorityKey,
+# doar explica textual grupul deja calculat.
+# ----------------------------------------------------------------------
+
+
+def test_reason_followup_scadent(agent):
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    rows = [
+        (contact_id, "Contact Scadent", "ACTIVE", PAST, "PENDING", None, NOW, None),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=rows)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary = next(c for c in result if c.contact_id == contact_id)
+    assert summary.reason == "Follow-up scadent"
+
+
+def test_reason_fara_niciun_followup(agent):
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    rows = [
+        (contact_id, "Contact Fara FollowUp", "ACTIVE", None, None, None, NOW, None),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=rows)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary = next(c for c in result if c.contact_id == contact_id)
+    assert summary.reason == "Fără follow-up programat"
+
+
+def test_reason_followup_viitor(agent):
+    """FollowUp PENDING dar programat in viitor -> reason distinct de 'fara niciun followup'."""
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    rows = [
+        (contact_id, "Contact Viitor", "ACTIVE", FUTURE, "PENDING", None, NOW, None),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=rows)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary = next(c for c in result if c.contact_id == contact_id)
+    assert summary.reason == "Fără follow-up scadent"
+
+
+def test_reason_followup_completat(agent):
+    """FollowUp COMPLETED (nu scadent, nu viitor) -> 'Prioritate dupa actualizare'."""
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    rows = [
+        (contact_id, "Contact Completat", "ACTIVE", PAST, "COMPLETED", None, NOW, None),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=rows)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary = next(c for c in result if c.contact_id == contact_id)
+    assert summary.reason == "Prioritate după actualizare"
+
+
+def test_reason_nu_afecteaza_ordinea_sortarii(agent):
+    """
+    reason e strict text explicativ - PriorityKey/sortarea ramane
+    neschimbata, indiferent de reason (regresie explicita ceruta de owner).
+    """
+    owner_id = uuid4()
+    contact_scadent = uuid4()
+    contact_viitor = uuid4()
+
+    rows = [
+        (contact_viitor, "Contact Viitor", "ACTIVE", FUTURE, "PENDING", None, NOW, None),
+        (contact_scadent, "Contact Scadent", "ACTIVE", PAST, "PENDING", None, NOW, None),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=rows)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    result_ids = [c.contact_id for c in result]
+    assert result_ids.index(contact_scadent) < result_ids.index(contact_viitor)
+
+
+# ----------------------------------------------------------------------
+# CONVERTED fara rand nici in clients, nici in partners (date
+# inconsistente) - contract sectiunea 9, caz explicit dar netestat
+# pana acum (gasit la auditul din 17 august 2026).
+# ----------------------------------------------------------------------
+
+
+def test_converted_fara_client_fara_partner_nu_produce_crash(agent):
+    """
+    Contact CONVERTED dar fara rand corespondent nici in clients, nici
+    in partners (date inconsistente in DB) - trebuie tratat explicit:
+    converted_to=None, pdi/pip=None, FARA exceptie ridicata.
+    """
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    rows = [
+        (contact_id, "Contact Inconsistent", "CONVERTED", None, None, None, NOW, None),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=rows)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary = next(c for c in result if c.contact_id == contact_id)
+    assert summary.converted_to is None
+    assert summary.pdi is None
+    assert summary.pip is None
