@@ -106,16 +106,18 @@ class ContactSummary:
     pip: Optional[float]                 # doar daca converted_to == "partner"
 ```
 
-**Regula de sortare v1 — explicită, verificabilă, fără scor compozit inventat:**
+**Regula de sortare v1 — CONFIRMATĂ explicit de owner (17 august 2026), nu doar propusă:**
 ```
-1. Contacte cu follow_up PENDING scadent (scheduled_at <= ACUM) — primele
-2. Contacte fără niciun follow_up (potențial neglijate) — următoarele
-3. Restul, sortate după updated_at DESC (cele mai recent atinse ultimele,
-   pentru a evita re-sugerarea repetată a acelorași contacte)
+1. FollowUp scadent (status='PENDING' AND scheduled_at <= ACUM) → prioritate maximă
+2. Contact fără niciun FollowUp (zero rânduri în follow_ups pentru acel contact_id) → nivelul următor
+3. Restul → sortat după updated_at DESC
 ```
-Această regulă e conservatoare și minimă intenționat: fără `PriorityEngine` real (absent din cod) și fără `RelationshipEngine` (absent din cod), nu există sursă pentru un scor de prioritate compozit. Inventarea unuia ar încălca disciplina "repo real → verificare → contract", exact regula pe care acest contract o aplică strict.
+Regulă declarată explicit ca decizie de business logic, nu fapt extras din `08-MVP-AGENT-001.md` (care cere doar "listă prioritizată + motiv", fără algoritm). Confirmată de owner după audit — nu se mai tratează ca presupunere de implementare.
 
-**`ARCHIVED` exclus explicit din output** — un contact arhivat nu justifică o recomandare de contactare azi.
+Precizări suplimentare confirmate în aceeași decizie:
+- **`ARCHIVED` exclus explicit din output** — un contact arhivat nu justifică o recomandare de contactare azi.
+- **`CONVERTED` rămâne disponibil** în lista operațională, conform regulii de mai sus (nu primește tratament special de excludere) — dar **fără scor KPI artificial**: `pdi`/`pip` se populează doar dacă există deja o scriere reală în `scores` (v. secțiunea 2.4/3), niciodată calculate sau aproximate de agent.
+- Toate cele 3 grupuri rămân filtrate strict la `owner_id`-ul din `current_user` (secțiunea 7) — regula de sortare se aplică DUPĂ filtrare, niciodată înainte.
 
 ---
 
