@@ -22,12 +22,14 @@ Nu implementate (out of scope v1, contract secțiunea 4 și 10):
 - Conversation Agent / context conversațional
 - Scor de prioritate compozit (echivalentul PriorityEngine pentru Contact)
 
-Limitare semnalată explicit (nu ascunsă): scorurile PDI/PIP sunt citite
-per owner_id (cel mai recent scor global al liderului), nu per Partener
-individual — identic cu precedentul din `PartnerAgent.get_recent_scores()`.
-Dacă un owner are mai mulți Contacți convertiți în Partner, toți vor
-afișa același PDI/PIP (cel mai recent global). Distincția per-partener
-ar necesita o interogare suplimentară per contact, în afara scopului v1.
+Corectură de granularitate (contract secțiunea 3.1, CONFIRMATĂ
+17 august 2026): PDI/PIP sunt citite per Partener individual
+(`scores.entity_id = partners.id`), NU agregat per `owner_id`. O primă
+implementare (GREEN inițial) citea cel mai recent scor al oricărui
+Partener al owner-ului, aplicat identic tuturor Contactelor convertite
+în Partener — bug de granularitate, nu simplificare de scop, corectat
+aici. Verificat direct în `partner_engine.py:229`: `entity_id` e
+populat cu `partner_id` exact, deci datele corecte există deja în DB.
 """
 
 from dataclasses import dataclass
@@ -39,9 +41,18 @@ from src.data.db import get_connection
 
 # Tuplul brut întors de interogarea principală, în ordinea coloanelor:
 # (contact_id, full_name, status, last_followup_at, last_followup_status,
-#  converted_to, updated_at)
+#  converted_to, updated_at, partner_id)
+# `partner_id` e None dacă `converted_to != "partner"`, folosit exclusiv
+# pentru a mapa scorul PDI/PIP al Partenerului corect (v. secțiunea 3.1).
 _ContactRow = Tuple[
-    UUID, str, str, Optional[datetime], Optional[str], Optional[str], datetime
+    UUID,
+    str,
+    str,
+    Optional[datetime],
+    Optional[str],
+    Optional[str],
+    datetime,
+    Optional[UUID],
 ]
 
 
@@ -121,37 +132,43 @@ class ContactAgent:
         Returns:
             Lista de ContactSummary, excluzând Contactele ARCHIVED,
             sortată: FollowUp scadent, apoi fără FollowUp, apoi restul
-            după `updated_at` descrescător.
+            după `updated_at` descrescător. Fiecare Contact convertit
+            în Partener primește scorul PDI/PIP al PROPRIULUI Partener
+            (v. secțiunea 3.1 din contract — corectură de granularitate).
         """
         rows = self._fetch_contacts(owner_id)
         active_rows = [row for row in rows if row[2] != "ARCHIVED"]
 
-        has_partner_contact = any(row[5] == "partner" for row in active_rows)
-        scores = self._fetch_partner_scores(owner_id) if has_partner_contact else {}
+        partner_ids = [row[7] for row in active_rows if row[5] == "partner"]
+        scores_by_partner = self._fetch_partner_scores(owner_id, partner_ids) if partner_ids else {}
 
         sorted_rows = sorted(active_rows, key=self._sort_key)
 
-        return [
-            ContactSummary(
-                contact_id=contact_id,
-                full_name=full_name,
-                status=status,
-                last_followup_at=last_followup_at,
-                last_followup_status=last_followup_status,
-                converted_to=converted_to,
-                pdi=scores.get("PDI") if converted_to == "partner" else None,
-                pip=scores.get("PIP") if converted_to == "partner" else None,
+        result: List[ContactSummary] = []
+        for (
+            contact_id,
+            full_name,
+            status,
+            last_followup_at,
+            last_followup_status,
+            converted_to,
+            _updated_at,
+            partner_id,
+        ) in sorted_rows:
+            partner_scores = scores_by_partner.get(partner_id, {}) if converted_to == "partner" else {}
+            result.append(
+                ContactSummary(
+                    contact_id=contact_id,
+                    full_name=full_name,
+                    status=status,
+                    last_followup_at=last_followup_at,
+                    last_followup_status=last_followup_status,
+                    converted_to=converted_to,
+                    pdi=partner_scores.get("PDI"),
+                    pip=partner_scores.get("PIP"),
+                )
             )
-            for (
-                contact_id,
-                full_name,
-                status,
-                last_followup_at,
-                last_followup_status,
-                converted_to,
-                _updated_at,
-            ) in sorted_rows
-        ]
+        return result
 
     @staticmethod
     def _sort_key(row: _ContactRow) -> Tuple[int, float]:
@@ -167,7 +184,7 @@ class ContactAgent:
             contract nu specifică o ordine secundară, deci `tie_break`
             rămâne `0.0` (ordinea de intrare se păstrează, sortare stabilă).
         """
-        _, _, _, last_followup_at, last_followup_status, _, updated_at = row
+        _, _, _, last_followup_at, last_followup_status, _, updated_at, _partner_id = row
         group = _priority_group(last_followup_at, last_followup_status)
         tie_break = -updated_at.timestamp() if group == 2 else 0.0
         return group, tie_break
@@ -198,7 +215,8 @@ class ContactAgent:
                     WHEN p.id IS NOT NULL THEN 'partner'
                     ELSE NULL
                 END,
-                c.updated_at
+                c.updated_at,
+                p.id
             FROM contacts c
             LEFT JOIN LATERAL (
                 SELECT scheduled_at, status
@@ -217,34 +235,50 @@ class ContactAgent:
                 cur.execute(query, (owner_id,))
                 return cur.fetchall()
 
-    def _fetch_partner_scores(self, owner_id: UUID) -> Dict[str, float]:
-        """Citește cele mai recente scoruri PDI/PIP ale partenerilor owner-ului.
+    def _fetch_partner_scores(
+        self, owner_id: UUID, partner_ids: List[UUID]
+    ) -> Dict[UUID, Dict[str, float]]:
+        """Citește cele mai recente scoruri PDI/PIP per Partener individual.
 
-        READ-ONLY, același tipar ca `PartnerAgent.get_recent_scores()`.
-        CRH nu apare niciodată aici — zero producători în `scores`
-        (verificat în audit, contract secțiunea 2.4).
+        Corectură de granularitate (contract secțiunea 3.1, CONFIRMATĂ
+        17 august 2026): filtrează explicit pe `p.id = ANY(partner_ids)`,
+        nu doar pe `owner_id` — fiecare Partener primește propriul scor,
+        niciodată scorul altui Partener al aceluiași owner. Filtrul
+        `p.owner_id = %s` rămâne ca a doua verificare de izolare
+        (apărare în profunzime, același principiu ca excluderea
+        `ARCHIVED` — verificată și în SQL, și, indirect, prin sursa
+        `partner_ids`, deja filtrată pe owner în `_fetch_contacts`).
+
+        READ-ONLY. CRH nu apare niciodată aici — zero producători în
+        `scores` (verificat în audit, contract secțiunea 2.4).
 
         Args:
             owner_id: Identificatorul liderului.
+            partner_ids: Identificatorii Partenerilor pentru care se
+                caută scoruri — doar Contactele owner-ului convertite
+                în Partener, deja filtrate în `list_prioritized_contacts`.
 
         Returns:
-            Dict cu cel mult cheile "PDI"/"PIP" → cel mai recent
-            `score_value`. Dict gol dacă nu există nicio scriere reală.
+            Dict cheie `partner_id` → dict cu cel mult cheile
+            "PDI"/"PIP" → cel mai recent `score_value` al ACELUI
+            Partener. Dict gol dacă `partner_ids` e gol sau nu există
+            nicio scriere reală.
         """
         query = """
-            SELECT k.metric_code, s.score_value
+            SELECT p.id, k.metric_code, s.score_value
             FROM scores s
             JOIN kpis k ON s.kpi_id = k.id
             JOIN partners p ON s.entity_id = p.id
             WHERE k.metric_code IN ('PDI', 'PIP')
               AND s.entity_type = 'partner'
               AND p.owner_id = %s
+              AND p.id = ANY(%s)
             ORDER BY s.calculated_at DESC
         """
-        result: Dict[str, float] = {}
+        result: Dict[UUID, Dict[str, float]] = {}
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (owner_id,))
-                for metric_code, score_value in cur.fetchall():
-                    result.setdefault(metric_code, score_value)
+                cur.execute(query, (owner_id, partner_ids))
+                for partner_id, metric_code, score_value in cur.fetchall():
+                    result.setdefault(partner_id, {}).setdefault(metric_code, score_value)
         return result
