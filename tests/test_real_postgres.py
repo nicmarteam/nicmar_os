@@ -414,3 +414,71 @@ class TestContactAgentOnRealPostgres:
         assert summary.converted_to == "partner"
         assert summary.pdi == 1.0
         assert summary.pip == 1.0
+
+    def test_pdi_pip_per_partener_individual_pe_date_reale(self):
+        """
+        Testul critic al corecturii de granularitate (contract sectiunea
+        3.1, CONFIRMATA 17 august 2026), pe PostgreSQL real - nu mock.
+
+        Scenariu exact confirmat:
+            Partner A -> PDI 10
+            Partner B -> PDI 90
+            Contact A (convertit in Partner A) -> trebuie sa primeasca 10
+            Contact B (convertit in Partner B) -> trebuie sa primeasca 90
+
+        Scorurile sunt inserate direct in `scores` (nu prin PartnerEngine,
+        care scrie doar placeholder 1.0 fix) - ca sa testam explicit
+        valori diferite intre cei doi Parteneri, pe date reale.
+        """
+        owner_id = _create_user("contact-pdi-granular")
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM kpis WHERE metric_code = 'PDI'")
+                pdi_kpi_id = cur.fetchone()[0]
+
+                cur.execute(
+                    "INSERT INTO contacts (owner_id, full_name, status) "
+                    "VALUES (%s, %s, 'CONVERTED') RETURNING id",
+                    (owner_id, "Contact A"),
+                )
+                contact_a = cur.fetchone()[0]
+                cur.execute(
+                    "INSERT INTO partners (owner_id, contact_id, status) "
+                    "VALUES (%s, %s, 'ACTIVATED') RETURNING id",
+                    (owner_id, contact_a),
+                )
+                partner_a = cur.fetchone()[0]
+
+                cur.execute(
+                    "INSERT INTO contacts (owner_id, full_name, status) "
+                    "VALUES (%s, %s, 'CONVERTED') RETURNING id",
+                    (owner_id, "Contact B"),
+                )
+                contact_b = cur.fetchone()[0]
+                cur.execute(
+                    "INSERT INTO partners (owner_id, contact_id, status) "
+                    "VALUES (%s, %s, 'ACTIVATED') RETURNING id",
+                    (owner_id, contact_b),
+                )
+                partner_b = cur.fetchone()[0]
+
+                cur.execute(
+                    "INSERT INTO scores (kpi_id, entity_type, entity_id, score_value, engine_source) "
+                    "VALUES (%s, 'partner', %s, %s, 'TEST-MANUAL')",
+                    (pdi_kpi_id, partner_a, 10.0),
+                )
+                cur.execute(
+                    "INSERT INTO scores (kpi_id, entity_type, entity_id, score_value, engine_source) "
+                    "VALUES (%s, 'partner', %s, %s, 'TEST-MANUAL')",
+                    (pdi_kpi_id, partner_b, 90.0),
+                )
+
+        contact_agent = ContactAgent()
+        result = contact_agent.list_prioritized_contacts(owner_id)
+
+        summary_a = next(c for c in result if c.contact_id == contact_a)
+        summary_b = next(c for c in result if c.contact_id == contact_b)
+
+        assert summary_a.pdi == 10.0
+        assert summary_b.pdi == 90.0
