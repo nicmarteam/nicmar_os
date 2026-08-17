@@ -70,9 +70,11 @@ class ContactSummary:
             (PENDING, COMPLETED, POSTPONED, RESCHEDULED), sau None.
         converted_to: "client" dacă există un rând corespondent în
             `clients`, "partner" dacă există în `partners`, altfel None.
-        pdi: Cel mai recent scor Partner Development Index al owner-ului,
-            populat doar când converted_to == "partner" și există deja
-            o scriere reală în `scores`. Niciodată calculat aici.
+        pdi: Cel mai recent scor Partner Development Index al PROPRIULUI
+            Partener (nu al owner-ului agregat — v. contract secțiunea
+            3.1), populat doar când converted_to == "partner" și există
+            deja o scriere reală în `scores` pentru acel `partner_id`.
+            Niciodată calculat aici.
         pip: Analog cu pdi, pentru Partner Integration Progress.
         reason: Motiv textual scurt, explicând liderului de ce apare
             Contactul în această poziție — derivat exclusiv din grupul
