@@ -71,9 +71,29 @@
 
 ---
 
-## DECIZIA 3 — Folosirea textelor canonice / variante generate
+## DECIZIA 3 — Folosirea textelor canonice / variante generate — ✅ CONFIRMATĂ (17 august 2026)
 
-**Status:** ⏳ NEÎNCEPUTĂ
+### Sursă
+`05-competente-37-motor1.md`, pașii 4 ("Construirea") și 5 ("Autenticitatea") din fluxul `04_Raspuns_La_O_Obiectie`.
+
+### Fapt verificat
+1. Sursa numește explicit 3 stiluri distincte: **Caldă și înțelegătoare**, **Scurtă și directă**, **Bazată pe o întrebare de deschidere**.
+2. Pasul 5 cere explicit editare de către lider înainte de trimitere ("Hai să schimbăm câteva cuvinte").
+3. Tabela `objections` nu avea niciun câmp pentru a stoca răspunsul trimis — doar `objection_text` (ce a spus prospectul).
+
+### Decizia owner-ului (confirmată)
+1. **3 variante distincte (caldă/directă/întrebare) pentru toate cele 13 categorii** din Bibliotecă (nu doar cele 6 eligibile automat) — 39 de texte în total.
+2. **Motorul acceptă și persistă text editat de lider** — extinde scope-ul `ObjectionEngine` de la strict READ-ONLY (ca `ContactAgent`) la READ+WRITE limitat.
+3. **Separare explicită de roluri, în schema DB:** `response_variant_used` păstrează varianta de ORIGINE (`CALDA`/`DIRECTA`/`INTREBARE`), nu e suprascrisă la editare — doar `response_text` se schimbă. Motiv: permite analiză ulterioară ("variantele CALDA generează mai multe continuări?"), posibilă sursă pentru `ORE`.
+
+### Migrație executată (schimbare de arhitectură, aprobată explicit înainte de execuție)
+```sql
+-- migrations/004_objection_response_columns.sql
+ALTER TABLE objections
+    ADD COLUMN response_text TEXT,
+    ADD COLUMN response_variant_used TEXT;
+```
+Verificat: mecanismul real de migrare din repo (fără ORM, SQL brut aplicat secvențial via `psql -f`, convenție `NNN_descriere.sql`, pas explicit adăugat în CI). Rulată pe PostgreSQL local, confirmată structural. Regresie completă: **179/179, 0 failed**.
 
 ---
 
