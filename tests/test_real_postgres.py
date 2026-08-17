@@ -28,6 +28,7 @@ from src.agents.followup.followup_agent import FollowUpAgent
 from src.engines.partner.partner_engine import PartnerEngine, PartnerAccessDeniedError
 from src.agents.partner.partner_agent import PartnerAgent
 from src.agents.contact.contact_agent import ContactAgent
+from src.engines.objection.objection_engine import ObjectionEngine, ObjectionNotFoundError
 
 
 pytestmark = pytest.mark.skipif(
@@ -507,3 +508,115 @@ class TestContactAgentOnRealPostgres:
         assert summary.converted_to is None
         assert summary.pdi is None
         assert summary.pip is None
+
+
+class TestObjectionEngineOnRealPostgres:
+    """
+    Valideaza fluxul complet ObjectionEngine pe PostgreSQL real: creare
+    obiectie, clasificare, submit_response cu persistare reala,
+    izolare owner_id, si BLOCK care nu scrie nimic.
+    """
+
+    def _create_objection(self, owner_id, category, text):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO objections (owner_id, objection_category, objection_text) "
+                    "VALUES (%s, %s, %s) RETURNING id",
+                    (owner_id, category, text),
+                )
+                return cur.fetchone()[0]
+
+    def test_submit_response_persista_real_pe_postgres(self):
+        owner_id = _create_user("objection-submit")
+        objection_id = self._create_objection(owner_id, "PRET", "Mi se pare cam scump.")
+
+        engine = ObjectionEngine()
+        result = engine.submit_response(
+            objection_id=objection_id,
+            owner_id=owner_id,
+            objection_category="PRET",
+            objection_text="Mi se pare cam scump.",
+            response_text="Înțeleg, chiar poate părea o investiție la prima vedere.",
+            response_variant_used="CALDA",
+        )
+
+        assert result.persisted is True
+        assert result.validation.level == "PASS"
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT response_text, response_variant_used FROM objections WHERE id = %s",
+                    (objection_id,),
+                )
+                row = cur.fetchone()
+
+        assert row[0] == "Înțeleg, chiar poate părea o investiție la prima vedere."
+        assert row[1] == "CALDA"
+
+    def test_submit_response_block_nu_scrie_nimic_pe_postgres(self):
+        owner_id = _create_user("objection-block")
+        objection_id = self._create_objection(owner_id, "PRET", "e scump")
+
+        engine = ObjectionEngine()
+        result = engine.submit_response(
+            objection_id=objection_id,
+            owner_id=owner_id,
+            objection_category="PRET",
+            objection_text="e scump",
+            response_text="Îți garantez că vei câștiga bani.",
+            response_variant_used="CALDA",
+        )
+
+        assert result.persisted is False
+        assert result.validation.level == "BLOCK"
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT response_text FROM objections WHERE id = %s", (objection_id,))
+                row = cur.fetchone()
+
+        assert row[0] is None
+
+    def test_submit_response_izoleaza_owner_id_pe_postgres(self):
+        """Liderul B nu poate persista un raspuns pe obiectia liderului A."""
+        owner_a = _create_user("objection-owner-a")
+        owner_b = _create_user("objection-owner-b")
+        objection_id = self._create_objection(owner_a, "TIMP", "nu am timp")
+
+        engine = ObjectionEngine()
+        with pytest.raises(ObjectionNotFoundError):
+            engine.submit_response(
+                objection_id=objection_id,
+                owner_id=owner_b,
+                objection_category="TIMP",
+                objection_text="nu am timp",
+                response_text="Înțeleg, poți începe cu 10 minute pe zi.",
+                response_variant_used="DIRECTA",
+            )
+
+    def test_clasificare_si_variante_pe_postgres_end_to_end(self):
+        """Flux complet: text liber -> clasificare -> variante -> submit."""
+        owner_id = _create_user("objection-e2e")
+        objection_text = "Nu am timp."
+        objection_id = self._create_objection(owner_id, "TIMP", objection_text)
+
+        engine = ObjectionEngine()
+        category = engine.classify(objection_text)
+        assert category == "TIMP"
+
+        variants = engine.get_variants(category)
+        assert set(variants.keys()) == {"CALDA", "DIRECTA", "INTREBARE"}
+
+        result = engine.submit_response(
+            objection_id=objection_id,
+            owner_id=owner_id,
+            objection_category=category,
+            objection_text=objection_text,
+            response_text=variants["DIRECTA"],
+            response_variant_used="DIRECTA",
+        )
+
+        assert result.persisted is True
+        assert result.validation.level == "PASS"
