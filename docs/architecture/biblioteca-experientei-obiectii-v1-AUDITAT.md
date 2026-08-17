@@ -21,26 +21,27 @@
 
 ---
 
-## 1. Categorii finale (14, actualizat de la propunerea inițială de 12)
+## 1. Categorii finale (13, actualizat după Decizia 2 — `NEINCREDERE_PRODUS` eliminată, nesusținută de nicio sursă reală)
 
-| Cod | Categorie | Confirmat în surse |
+| Cod | Categorie | Eligibilă clasificare automată v1? |
 |---|---|---|
-| `PRET` | Preț / cost | 4+ surse |
-| `TIMP` | Lipsă de timp | 5+ surse |
-| `INCREDERE_STRUCTURA` | "E piramidă?" / "E MLM?" / "Sună prea frumos" | 6+ surse |
-| `FAMILIE_SUPORT` | Familie/partener sceptic | 4+ surse |
-| `FRICA_VORBIT` | Frică de refuz / nu mă pricep la vorbit cu oamenii | 3+ surse |
-| `FRICA_TEHNOLOGIE` | Nepricepere tehnologie/social media | 2+ surse |
-| `FRICA_ESEC` | Am mai încercat și n-a mers | 3+ surse |
-| `IMAGINE_SOCIALA` | Ce o să zică lumea | 2 surse |
-| `VULNERABILITATE_IZOLARE` | Singurătate, vârstă, povară — **uz restricționat**, secțiunea 3 | 4+ surse |
-| `NU_VREAU_VANZARE` | Nu vreau să "vând"/să exploatez prietenii | 3+ surse |
-| `AMANARE` | Nu e momentul / trebuie să mă gândesc | 5+ surse |
-| `NEINCREDERE_PRODUS` | Produsul nu e eficient / prea scump | 3+ surse |
-| `NU_CUNOSC_OAMENI` | Nu cunosc suficienți oameni | 2 surse |
-| `PIATA_SATURATA` | Piața e saturată / prea mulți fac deja asta | 2 surse |
+| `PRET` | Preț / cost | ✅ Da |
+| `TIMP` | Lipsă de timp | ✅ Da |
+| `INCREDERE_STRUCTURA` | "E piramidă?" / "E MLM?" / "Sună prea frumos" | ✅ Da |
+| `FAMILIE_SUPORT` | Familie/partener sceptic | ✅ Da |
+| `AMANARE` | Nu e momentul / trebuie să mă gândesc | ✅ Da |
+| `FRICA_TEHNOLOGIE` | Nepricepere tehnologie/social media | ✅ Da |
+| `FRICA_ESEC` | Am mai încercat și n-a mers | 🟡 Nu — acoperire limitată |
+| `FRICA_VORBIT` | Frică de refuz / nu mă pricep la vorbit cu oamenii | 🟡 Nu — acoperire limitată |
+| `NU_CUNOSC_OAMENI` | Nu cunosc suficienți oameni | 🟡 Nu — acoperire limitată |
+| `VULNERABILITATE_IZOLARE` | Singurătate, vârstă, povară — **uz restricționat**, secțiunea 3 | 🟡 Nu — context, nu obiecție-citat |
+| `IMAGINE_SOCIALA` | Ce o să zică lumea | 🔴 Nu — acoperire insuficientă |
+| `NU_VREAU_VANZARE` | Nu vreau să "vând"/să exploatez prietenii | 🔴 Nu — acoperire insuficientă |
+| `PIATA_SATURATA` | Piața e saturată / prea mulți fac deja asta | 🔴 Nu — acoperire insuficientă |
 
-Propunere, necesită confirmarea ta explicită înainte de a deveni `CHECK` constraint pe `objections.objection_category`.
+**`NEINCREDERE_PRODUS` — eliminată complet din listă** (17 august 2026): nicio sursă reală n-a confirmat-o cu o formulare-citat; fusese inferată, nu extrasă din material. Detalii audit: `21-objection-engine-decizii-preliminare.md`, Decizia 2.
+
+Confirmată de owner (Decizia 2, 17 august 2026) — v. `21-objection-engine-decizii-preliminare.md` pentru auditul complet de acoperire.
 
 ---
 
@@ -79,8 +80,8 @@ Propunere, necesită confirmarea ta explicită înainte de a deveni `CHECK` cons
 ### `AMANARE`
 > „Complet înțeleg, e o decizie și merită timp de gândire. Nu e nicio grabă din partea mea — ia tot timpul de care ai nevoie. Îți las informațiile la îndemână, pentru oricând ești pregătit/ă."
 
-### `NEINCREDERE_PRODUS`
-> „E o întrebare corectă. Cel mai simplu e să-ți arăt exemple concrete și, dacă vrei, o mostră de testare — decizi tu după ce vezi/încerci, nu doar pe baza cuvântului meu."
+### ~~`NEINCREDERE_PRODUS`~~ — ELIMINATĂ (Decizia 2, 17 august 2026)
+Text păstrat doar ca referință istorică, nu mai e categorie oficială: *"E o întrebare corectă. Cel mai simplu e să-ți arăt exemple concrete și, dacă vrei, o mostră de testare — decizi tu după ce vezi/încerci, nu doar pe baza cuvântului meu."* Nicio sursă reală nu a confirmat această categorie cu o formulare-citat — a fost inferată, nu extrasă din material.
 
 ### `NU_CUNOSC_OAMENI`
 > „Toți simțim asta la început — dar nu ai nevoie să cunoști mii de oameni, doar câțiva ca să pornești. Vrei să-ți arăt cum se construiește, pas cu pas, chiar și cu 2-3 cunoștințe?"
