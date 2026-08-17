@@ -1,0 +1,208 @@
+"""
+Teste RED pentru ObjectionEngine (clasa care leaga clasificare +
+biblioteca + safety validation + persistare).
+
+Sursa: 21-objection-engine-contract.md, sectiunile 1, 4, 5; criterii 7.3.
+"""
+
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
+
+import pytest
+
+from src.engines.objection.objection_engine import ObjectionEngine, ObjectionNotFoundError
+
+
+def _make_cursor(rowcount=1):
+    mock_cur = MagicMock()
+    mock_cur.rowcount = rowcount
+    mock_cur.__enter__.return_value = mock_cur
+    mock_cur.__exit__.return_value = False
+    return mock_cur
+
+
+def _make_conn(mock_cur):
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value = mock_cur
+    mock_conn.__enter__.return_value = mock_conn
+    mock_conn.__exit__.return_value = False
+    return mock_conn
+
+
+@pytest.fixture
+def engine():
+    return ObjectionEngine()
+
+
+# ----------------------------------------------------------------------
+# classify() - deleaga la classifier.py, deja testat separat
+# ----------------------------------------------------------------------
+
+
+def test_classify_deleaga_la_classifier(engine):
+    assert engine.classify("Nu am timp.") == "TIMP"
+    assert engine.classify("text fara nicio potrivire") is None
+
+
+# ----------------------------------------------------------------------
+# get_variants() - deleaga la library.py
+# ----------------------------------------------------------------------
+
+
+def test_get_variants_deleaga_la_library(engine):
+    variants = engine.get_variants("PRET")
+    assert set(variants.keys()) == {"CALDA", "DIRECTA", "INTREBARE"}
+
+
+# ----------------------------------------------------------------------
+# submit_response - BLOCK nu persista
+# ----------------------------------------------------------------------
+
+
+def test_submit_response_block_nu_scrie_in_db(engine):
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor()
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = engine.submit_response(
+            objection_id=uuid4(),
+            owner_id=uuid4(),
+            objection_category="PRET",
+            objection_text="e scump",
+            response_text="Îți garantez că vei câștiga bani.",
+            response_variant_used="CALDA",
+        )
+
+        assert result.persisted is False
+        assert result.validation.level == "BLOCK"
+        mock_cur.execute.assert_not_called()
+
+
+# ----------------------------------------------------------------------
+# submit_response - PASS persista corect
+# ----------------------------------------------------------------------
+
+
+def test_submit_response_pass_scrie_response_text_si_variant(engine):
+    owner_id = uuid4()
+    objection_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(rowcount=1)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = engine.submit_response(
+            objection_id=objection_id,
+            owner_id=owner_id,
+            objection_category="PRET",
+            objection_text="e scump",
+            response_text="Înțeleg, chiar poate părea o investiție.",
+            response_variant_used="CALDA",
+        )
+
+        assert result.persisted is True
+        assert result.validation.level == "PASS"
+
+        executed_sql = mock_cur.execute.call_args[0][0]
+        executed_params = mock_cur.execute.call_args[0][1]
+
+        assert "UPDATE" in executed_sql
+        assert "response_text" in executed_sql
+        assert "response_variant_used" in executed_sql
+        assert objection_id in executed_params
+        assert owner_id in executed_params
+
+
+# ----------------------------------------------------------------------
+# submit_response - izolare owner_id in WHERE
+# ----------------------------------------------------------------------
+
+
+def test_submit_response_filtreaza_owner_id_in_where(engine):
+    owner_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(rowcount=1)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.submit_response(
+            objection_id=uuid4(),
+            owner_id=owner_id,
+            objection_category="TIMP",
+            objection_text="nu am timp",
+            response_text="Înțeleg, poți începe cu 10 minute pe zi.",
+            response_variant_used="DIRECTA",
+        )
+
+        executed_sql = mock_cur.execute.call_args[0][0]
+        assert "owner_id" in executed_sql
+
+
+# ----------------------------------------------------------------------
+# submit_response - obiectie inexistenta / owner gresit -> eroare explicita
+# ----------------------------------------------------------------------
+
+
+def test_submit_response_obiectie_inexistenta_ridica_eroare(engine):
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(rowcount=0)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        with pytest.raises(ObjectionNotFoundError):
+            engine.submit_response(
+                objection_id=uuid4(),
+                owner_id=uuid4(),
+                objection_category="TIMP",
+                objection_text="nu am timp",
+                response_text="Înțeleg, poți începe cu 10 minute pe zi.",
+                response_variant_used="DIRECTA",
+            )
+
+
+# ----------------------------------------------------------------------
+# submit_response - PARTIAL_VALIDATION / HUMAN_REVIEW nu blocheaza persistarea
+# ----------------------------------------------------------------------
+
+
+def test_submit_response_partial_validation_tot_persista(engine):
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(rowcount=1)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = engine.submit_response(
+            objection_id=uuid4(),
+            owner_id=uuid4(),
+            objection_category="INCREDERE_STRUCTURA",
+            objection_text="e piramida?",
+            response_text="De ce întrebi asta?",
+            response_variant_used="INTREBARE",
+        )
+
+        assert result.persisted is True
+        assert result.validation.level == "PARTIAL_VALIDATION"
+        mock_cur.execute.assert_called_once()
+
+
+# ----------------------------------------------------------------------
+# response_variant_used ramane cel trimis, motorul nu il modifica
+# ----------------------------------------------------------------------
+
+
+def test_submit_response_pastreaza_exact_variant_used_trimis(engine):
+    """Editarea response_text nu schimba response_variant_used - motorul
+    persista exact ce i se transmite, nu recalculeaza originea."""
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(rowcount=1)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.submit_response(
+            objection_id=uuid4(),
+            owner_id=uuid4(),
+            objection_category="PRET",
+            objection_text="e scump",
+            response_text="Text complet editat de lider, diferit de original.",
+            response_variant_used="CALDA",
+        )
+
+        executed_params = mock_cur.execute.call_args[0][1]
+        assert "CALDA" in executed_params
