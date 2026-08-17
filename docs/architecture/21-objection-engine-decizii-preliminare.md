@@ -95,6 +95,9 @@ ALTER TABLE objections
 ```
 Verificat: mecanismul real de migrare din repo (fără ORM, SQL brut aplicat secvențial via `psql -f`, convenție `NNN_descriere.sql`, pas explicit adăugat în CI). Rulată pe PostgreSQL local, confirmată structural. Regresie completă: **179/179, 0 failed**.
 
+### Conținut livrat
+Cele 39 de texte (3 variante × 13 categorii) — `biblioteca-experientei-variante-v1.md`, scrise respectând toate excluderile de siguranță deja stabilite (secțiunea 4, `biblioteca-experientei-v1-CONSOLIDAT.md`). `VULNERABILITATE_IZOLARE` include nota de uz restricționat direct în text.
+
 ---
 
 ## DECIZIA 4 — Regula pentru situații sensibile / excluderi de siguranță
