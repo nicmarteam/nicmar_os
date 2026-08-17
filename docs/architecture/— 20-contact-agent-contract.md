@@ -75,7 +75,15 @@ kpis(id, metric_code UNIQUE, name, status, ...)
 | `contacts` | listă contacte ale `owner_id`, cu `status` | `SELECT ... WHERE owner_id = %s`, index `idx_contacts_owner_status` |
 | `clients` / `partners` | dacă un contact convertit are rând corespondent (context, nu recalculare) | `LEFT JOIN` opțional pe `contact_id` |
 | `follow_ups` | cel mai recent follow-up per contact (dată, status) — pentru "ultima interacțiune" | `SELECT ... WHERE contact_id = %s ORDER BY scheduled_at DESC LIMIT 1`, per contact |
-| `scores` + `kpis` | scor `PDI`/`PIP` cel mai recent, DOAR pentru contactele convertite în Partner (via JOIN pe `partners.contact_id`) | tipar identic cu `PartnerAgent.get_recent_scores()` |
+| `scores` + `kpis` | scor `PDI`/`PIP` cel mai recent **per Partener individual** (`entity_id = partners.id`), DOAR pentru contactele convertite în Partner | `WHERE p.id = ANY(partner_ids) AND p.owner_id = %s` — v. corectură secțiunea 3.1 |
+
+### 3.1 Corectură de granularitate (confirmată 17 august 2026, audit tehnic)
+
+**Bug identificat, nu simplificare de scop:** o primă implementare (GREEN inițial) citea PDI/PIP agregat per `owner_id` — cel mai recent scor al **oricărui** Partener al liderului, aplicat identic tuturor Contactelor convertite în Partener ale acelui owner. Verificat direct în `partner_engine.py:229`: `scores.entity_id` e populat cu `partner_id` exact — granularitatea per-Partener **există deja în schema DB**, doar interogarea inițială nu o folosea.
+
+**Corectat:** `ContactAgent` citește PDI/PIP filtrat pe `partner_id`-ul specific al fiecărui Contact convertit, nu pe `owner_id` agregat. Fiecare Contact convertit în Partener primește scorul propriului Partener, niciodată al altuia.
+
+**Motiv pentru care nu a fost tratat ca "limitare acceptabilă v1":** spre deosebire de alte simplificări din acest contract (ex. Partner exclus din `PriorityEngine`, unde datele pentru a face altfel nu există), aici datele corecte există deja în `scores.entity_id`. A le ignora ar fi însemnat livrarea unui rezultat cunoscut-incorect, nu doar incomplet.
 
 **`CRH` explicit exclus din citire în v1** — motiv verificat, nu presupus: zero producători în cod (secțiunea 2.4). A citi un KPI care nu e scris niciodată ar întoarce mereu `None`/listă goală — comportament corect tehnic, dar contractul îl semnalează explicit ca "citire fără sursă", nu ca omisiune tăcută.
 
