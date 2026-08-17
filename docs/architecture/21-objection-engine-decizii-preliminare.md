@@ -100,12 +100,66 @@ Cele 39 de texte (3 variante × 13 categorii) — `biblioteca-experientei-varian
 
 ---
 
-## DECIZIA 4 — Regula pentru situații sensibile / excluderi de siguranță
+## DECIZIA 4 — Regula pentru situații sensibile / excluderi de siguranță — ✅ CONFIRMATĂ (17 august 2026)
 
-**Status:** ⏳ NEÎNCEPUTĂ
+### Sursă
+Cele 10 excluderi propuse de owner + auditul de conținut deja făcut (`biblioteca-experientei-v1-CONSOLIDAT.md`, secțiunea 4 — exploatare vulnerabilitate; `Pașii_de_bază_afacerii.docx` — evitare răspuns direct).
+
+### Verificare de precedent
+`RuleEngine` existent — verificat, **nu e o potrivire**: evaluează reguli structurale de creare de entități (Mission/FollowUp/Partner), nu validare de conținut text. Nu se reutilizează.
+
+### Decizia owner-ului (verdict final)
+
+> **ObjectionEngine v1 utilizează mecanisme tehnice distincte pentru cele 10 categorii de excluderi de siguranță. Nivelul de acoperire este diferențiat între BLOCK, PARTIAL VALIDATION și HUMAN REVIEW. Sistemul nu revendică detectarea deterministă a riscurilor care necesită înțelegere semantică, verificarea adevărului factual sau context conversațional istoric. Orice limitare identificată rămâne explicit documentată și nu este prezentată ca protecție completă.**
+
+### Mecanisme confirmate, per categorie de excludere
+
+| Excludere | Nivel | Mecanism |
+|---|---|---|
+| Promisiuni nerealiste/garantare rezultate | **BLOCK** | Listă cuvinte-cheie interzise ("garantat", "sigur", "100%") |
+| Presiune financiară | **BLOCK** | Listă cuvinte-cheie ("trebuie să investești acum", "prețul crește") |
+| "Trebuie să decizi acum" | **BLOCK** | Listă cuvinte-cheie ("acum sau niciodată", "doar azi", "ultima șansă") |
+| Exploatarea vulnerabilităților | **BLOCK** | Listă derivată din auditul real (secțiunea 4, Bibliotecă) |
+| Presiune/manipulare emoțională generală | **PARTIAL VALIDATION** | Aceeași listă combinată — prinde tipare cunoscute, nu manipulare subtilă neprevăzută |
+| Afirmații false/neverificabile | **PARTIAL VALIDATION** | Listă de afirmații cunoscute problematice din audit — nu verificare generală de adevăr |
+| Ascunderea informațiilor | **PARTIAL VALIDATION** | Doar pe `INCREDERE_STRUCTURA`: răspunsul trebuie să conțină confirmare directă |
+| Devierea de la răspunsul onest | **PARTIAL VALIDATION** | Același mecanism, extins unde există exemplu concret din audit |
+| Inventarea de testimoniale/dovezi | **HUMAN REVIEW** | Marcaje suspecte ("studii arată", "conform...") → semnalare, nu blocaj automat |
+| Ocolirea refuzului explicit al prospectului | **HUMAN REVIEW** | Verificare pe `objection_text` curent (refuz clar) vs. markeri de insistență în răspuns — fără istoric de conversație |
+
+**Comportament confirmat:** `BLOCK` → răspunsul nu poate fi persistat/trimis. `PARTIAL VALIDATION` și `HUMAN REVIEW` → nu blochează, doar semnalează pentru verificare umană înainte de trimitere.
 
 ---
 
-## DECIZIA 5 — Cifre de venit / disclaimer obligatoriu
+## DECIZIA 5 — Cifre de venit / disclaimer obligatoriu — ✅ CONFIRMATĂ (17 august 2026)
 
-**Status:** ⏳ NEÎNCEPUTĂ
+### Sursă
+`Planul_de_20_minute.docx`, `Planul_de_5_minute_bun.docx` — cifre de venit fără disclaimer. Cele 39 de texte canonice verificate: **curate, zero cifre de venit** — regula operează exclusiv pe `response_text` (text final, posibil editat de lider), nu necesită modificarea Bibliotecii.
+
+### Regula (formulare finală, precizată de owner)
+
+Dacă `response_text` conține **o afirmație identificabilă privind venituri sau rezultate financiare** (nu orice cifră — ex. "Programul durează 15 zile" nu se califică), sistemul verifică disclaimerul obligatoriu:
+
+> „Rezultatele variază de la persoană la persoană și nu sunt garantate."
+
+**Detectare v1:** combinație de (valoare numerică) + (monedă: lei/RON/euro/EUR) + (context financiar: venit/câștig/câștiguri/lunar/pe lună/an/pe an).
+
+**Nivel:** `BLOCK` — nu se poate persista fără disclaimer.
+
+**Flux:** Editare lider → Safety Validation → detectare afirmație financiară → verificare disclaimer → PASS/BLOCK. Mesaj la blocare: *"Textul conține o afirmație privind venituri fără disclaimerul obligatoriu."*
+
+**Regulă Human-in-the-loop explicită:** sistemul **nu adaugă automat** disclaimerul — liderul trebuie să-l scrie el însuși. Păstrează clar ce a fost efectiv scris și trimis de lider.
+
+---
+
+## Toate cele 5 decizii — ÎNCHISE (17 august 2026)
+
+| Decizie | Status |
+|---|---|
+| 1 — Scope v1 | ✅ |
+| 2 — Clasificare | ✅ |
+| 3 — Bibliotecă + persistare | ✅ |
+| 4 — Safety exclusions | ✅ |
+| 5 — Income disclaimer | ✅ |
+
+**Următorul pas:** `21-objection-engine-contract.md` — contractul tehnic final, consolidând toate cele 5 decizii.
