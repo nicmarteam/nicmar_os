@@ -482,3 +482,28 @@ class TestContactAgentOnRealPostgres:
 
         assert summary_a.pdi == 10.0
         assert summary_b.pdi == 90.0
+
+    def test_converted_fara_client_fara_partner_pe_date_reale(self):
+        """
+        Caz de date inconsistente pe Postgres real: Contact cu status
+        CONVERTED, dar fara niciun rand corespunzator in clients sau
+        partners. LEFT JOIN + CASE trebuie sa produca NULL, nu eroare.
+        """
+        owner_id = _create_user("contact-inconsistent")
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO contacts (owner_id, full_name, status) "
+                    "VALUES (%s, %s, 'CONVERTED') RETURNING id",
+                    (owner_id, "Contact Fara Client Sau Partner"),
+                )
+                contact_id = cur.fetchone()[0]
+
+        agent = ContactAgent()
+        result = agent.list_prioritized_contacts(owner_id)
+        summary = next(c for c in result if c.contact_id == contact_id)
+
+        assert summary.converted_to is None
+        assert summary.pdi is None
+        assert summary.pip is None
