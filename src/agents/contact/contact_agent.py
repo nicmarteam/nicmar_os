@@ -74,6 +74,10 @@ class ContactSummary:
             populat doar când converted_to == "partner" și există deja
             o scriere reală în `scores`. Niciodată calculat aici.
         pip: Analog cu pdi, pentru Partner Integration Progress.
+        reason: Motiv textual scurt, explicând liderului de ce apare
+            Contactul în această poziție — derivat exclusiv din grupul
+            de prioritate deja calculat, nu recalculează nimic
+            (v. contract secțiunea 5.1).
     """
 
     contact_id: UUID
@@ -84,6 +88,7 @@ class ContactSummary:
     converted_to: Optional[str]
     pdi: Optional[float]
     pip: Optional[float]
+    reason: str
 
 
 def _priority_group(
@@ -111,6 +116,38 @@ def _priority_group(
     if last_followup_status == "PENDING" and last_followup_at <= datetime.now(timezone.utc):
         return 0
     return 2
+
+
+def _reason(last_followup_at: Optional[datetime], last_followup_status: Optional[str]) -> str:
+    """Calculează motivul textual afișat liderului pentru un Contact.
+
+    Regulă CONFIRMATĂ (20-contact-agent-contract.md, secțiunea 5.1,
+    17 august 2026). Strict text explicativ — NU recalculează
+    `PriorityKey`, NU influențează sortarea. Derivă din același grup
+    calculat de `_priority_group()`, cu o singură distincție textuală
+    suplimentară în interiorul Grupului 2 (restul): un FollowUp
+    `PENDING` programat în viitor primește un text diferit față de
+    restul cazurilor (`COMPLETED`/`POSTPONED`/`RESCHEDULED`).
+
+    Args:
+        last_followup_at: Data programată a celui mai recent FollowUp.
+        last_followup_status: Starea celui mai recent FollowUp.
+
+    Returns:
+        Motivul textual scurt, exact cum a fost confirmat:
+            Grup 0 → "Follow-up scadent"
+            Grup 1 → "Fără follow-up programat"
+            Grup 2, PENDING viitor → "Fără follow-up scadent"
+            Grup 2, restul → "Prioritate după actualizare"
+    """
+    group = _priority_group(last_followup_at, last_followup_status)
+    if group == 0:
+        return "Follow-up scadent"
+    if group == 1:
+        return "Fără follow-up programat"
+    if last_followup_status == "PENDING":
+        return "Fără follow-up scadent"
+    return "Prioritate după actualizare"
 
 
 class ContactAgent:
@@ -166,6 +203,7 @@ class ContactAgent:
                     converted_to=converted_to,
                     pdi=partner_scores.get("PDI"),
                     pip=partner_scores.get("PIP"),
+                    reason=_reason(last_followup_at, last_followup_status),
                 )
             )
         return result
