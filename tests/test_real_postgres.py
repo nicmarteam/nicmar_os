@@ -641,6 +641,47 @@ class TestObjectionEngineOnRealPostgres:
         assert result.validation.level == "PASS"
 
     # ------------------------------------------------------------------
+    # get_objection() — Decizia 8A, 25-get-objection-contract.md
+    # ------------------------------------------------------------------
+
+    def test_get_objection_returneaza_date_reale_pe_postgres(self):
+        """get_objection() citeste corect din PostgreSQL real, pentru owner-ul corect."""
+        owner_id = _create_user("get-objection-happy")
+        engine = ObjectionEngine()
+
+        created = engine.create_objection(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+
+        fetched = engine.get_objection(objection_id=created.id, owner_id=owner_id)
+
+        assert fetched == created
+
+    def test_get_objection_izoleaza_owner_id_pe_postgres(self):
+        """
+        User A creeaza o obiectie. User B incearca get_objection(id_A, user_B)
+        -> ObjectionNotFoundError, verificat pe PostgreSQL real, nu mockat.
+        """
+        owner_a = _create_user("get-objection-owner-a")
+        owner_b = _create_user("get-objection-owner-b")
+        engine = ObjectionEngine()
+
+        objection_a = engine.create_objection(
+            owner_id=owner_a, objection_text="nu am timp", objection_category="TIMP",
+        )
+
+        with pytest.raises(ObjectionNotFoundError):
+            engine.get_objection(objection_id=objection_a.id, owner_id=owner_b)
+
+    def test_get_objection_id_inexistent_ridica_eroare_pe_postgres(self):
+        """objection_id complet inexistent -> ObjectionNotFoundError, pe PostgreSQL real."""
+        owner_id = _create_user("get-objection-inexistent")
+        engine = ObjectionEngine()
+
+        with pytest.raises(ObjectionNotFoundError):
+            engine.get_objection(objection_id=uuid4(), owner_id=owner_id)
+
+    # ------------------------------------------------------------------
     # create_objection() — Decizia 2A, 20-2A-create-objection-contract.md
     # ------------------------------------------------------------------
 
@@ -803,9 +844,10 @@ class TestConversationAgentOnRealPostgres:
                 row = cur.fetchone()
                 assert row == ("TIMP", None)  # creat, dar fara raspuns inca
 
-        # Pasul 3 — confirmare, cu obiectul persistent (nu campuri reintroduse)
+        # Pasul 3 — confirmare, cu scalari (objection_id + owner_id), Decizia 8A
         confirmation = agent.confirm_response(
-            objection=prep.objection,
+            objection_id=prep.objection.id,
+            owner_id=owner_id,
             response_text=prep.variants["DIRECTA"],
             response_variant_used="DIRECTA",
         )
@@ -832,7 +874,8 @@ class TestConversationAgentOnRealPostgres:
         )
 
         confirmation = agent.confirm_response(
-            objection=prep.objection,
+            objection_id=prep.objection.id,
+            owner_id=owner_id,
             response_text="Îți garantez că vei câștiga bani.",
             response_variant_used="CALDA",
         )
@@ -847,7 +890,11 @@ class TestConversationAgentOnRealPostgres:
                 assert cur.fetchone()[0] is None
 
     def test_confirm_response_izoleaza_owner_id_prin_agent(self):
-        """Liderul B nu poate confirma un raspuns pe obiectia liderului A, prin agent."""
+        """
+        Liderul B nu poate confirma un raspuns pe obiectia liderului A, prin
+        agent — acum verificat direct la nivelul real de securitate
+        (get_objection() cu owner_id gresit), nu simuland un obiect manual.
+        """
         owner_a = _create_user("conv-agent-owner-a")
         owner_b = _create_user("conv-agent-owner-b")
         agent = ConversationAgent(objection_engine=ObjectionEngine())
@@ -856,18 +903,10 @@ class TestConversationAgentOnRealPostgres:
             owner_id=owner_a, objection_text="nu am timp", objection_category="TIMP",
         )
 
-        # objection "apartine" lui owner_a, dar simulam un obiect cu owner_id gresit
-        objection_cu_owner_gresit = Objection(
-            id=prep.objection.id, owner_id=owner_b,
-            conversation_id=prep.objection.conversation_id,
-            objection_category=prep.objection.objection_category,
-            objection_text=prep.objection.objection_text,
-            resolution_status=prep.objection.resolution_status,
-        )
-
         with pytest.raises(ObjectionNotFoundError):
             agent.confirm_response(
-                objection=objection_cu_owner_gresit,
+                objection_id=prep.objection.id,
+                owner_id=owner_b,
                 response_text="Înțeleg, poți începe cu 10 minute pe zi.",
                 response_variant_used="DIRECTA",
             )
