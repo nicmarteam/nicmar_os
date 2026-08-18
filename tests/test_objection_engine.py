@@ -406,3 +406,34 @@ def test_create_objection_apeluri_identice_creeaza_doua_randuri(engine):
 
         assert first.id != second.id
         assert mock_cur.execute.call_count == 2
+
+
+# ----------------------------------------------------------------------
+# list_categories - Decizia 6, 23-list-categories-contract.md
+# ----------------------------------------------------------------------
+
+
+def test_list_categories_returneaza_toate_cele_13(engine):
+    categories = engine.list_categories()
+    assert len(categories) == 13
+    assert set(categories) == {
+        "PRET", "TIMP", "INCREDERE_STRUCTURA", "FAMILIE_SUPORT", "AMANARE",
+        "FRICA_TEHNOLOGIE", "FRICA_ESEC", "FRICA_VORBIT", "NU_CUNOSC_OAMENI",
+        "VULNERABILITATE_IZOLARE", "IMAGINE_SOCIALA", "NU_VREAU_VANZARE", "PIATA_SATURATA",
+    }
+
+
+def test_list_categories_este_sortata_alfabetic(engine):
+    categories = engine.list_categories()
+    assert categories == sorted(categories)
+
+
+def test_list_categories_nu_atinge_db(engine):
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        engine.list_categories()
+        mock_get_conn.assert_not_called()
+
+
+def test_list_categories_returneaza_lista_nu_frozenset(engine):
+    categories = engine.list_categories()
+    assert isinstance(categories, list)
