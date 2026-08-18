@@ -31,6 +31,9 @@ from src.agents.partner.partner_agent import PartnerAgent
 from src.agents.contact.contact_agent import ContactAgent
 from src.engines.objection.objection_engine import Objection, ObjectionEngine, ObjectionNotFoundError
 from src.agents.conversation.conversation_agent import ConversationAgent
+from src.engines.conversation.conversation_engine import (
+    Conversation, ConversationEngine, ConversationAccessDeniedError,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -910,3 +913,128 @@ class TestConversationAgentOnRealPostgres:
                 response_text="Înțeleg, poți începe cu 10 minute pe zi.",
                 response_variant_used="DIRECTA",
             )
+
+
+class TestConversationEngineOnRealPostgres:
+    """
+    Valideaza ConversationEngine ("Conversation Writer") pe PostgreSQL
+    real — Decizia 29, 29-conversation-writer-contract.md. Nu are nicio
+    legatura cu ConversationAgent (Objection).
+    """
+
+    def _create_contact(self, owner_id):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO contacts (owner_id, full_name, status) "
+                    "VALUES (%s, %s, 'ACTIVE') RETURNING id",
+                    (owner_id, "Contact Test ConversationEngine"),
+                )
+                return cur.fetchone()[0]
+
+    def test_creeaza_conversatie_noua_pe_postgres_real(self):
+        owner_id = _create_user("conv-engine-create")
+        contact_id = self._create_contact(owner_id)
+        engine = ConversationEngine()
+
+        conversation = engine.get_or_create_conversation(owner_id=owner_id, contact_id=contact_id)
+
+        assert isinstance(conversation, Conversation)
+        assert conversation.owner_id == owner_id
+        assert conversation.contact_id == contact_id
+        assert conversation.channel == "WHATSAPP"
+        assert conversation.status == "INITIATED"
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT owner_id, contact_id, channel, status FROM conversations WHERE id = %s",
+                    (conversation.id,),
+                )
+                row = cur.fetchone()
+        assert row == (owner_id, contact_id, "WHATSAPP", "INITIATED")
+
+    def test_apel_repetat_returneaza_aceeasi_conversatie_idempotency(self):
+        """Doua apeluri pentru acelasi contact -> ACEEASI conversatie, nu doua randuri."""
+        owner_id = _create_user("conv-engine-idempotent")
+        contact_id = self._create_contact(owner_id)
+        engine = ConversationEngine()
+
+        first = engine.get_or_create_conversation(owner_id=owner_id, contact_id=contact_id)
+        second = engine.get_or_create_conversation(owner_id=owner_id, contact_id=contact_id)
+
+        assert first.id == second.id
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM conversations WHERE owner_id = %s AND contact_id = %s",
+                    (owner_id, contact_id),
+                )
+                assert cur.fetchone()[0] == 1
+
+    def test_user_b_nu_poate_crea_conversatie_pe_contactul_lui_user_a(self):
+        """
+        User A creeaza un contact. User B incearca
+        get_or_create_conversation(contact_id_A, owner_B) ->
+        ConversationAccessDeniedError, verificat pe PostgreSQL real.
+        """
+        owner_a = _create_user("conv-engine-owner-a")
+        owner_b = _create_user("conv-engine-owner-b")
+        contact_id_a = self._create_contact(owner_a)
+        engine = ConversationEngine()
+
+        with pytest.raises(ConversationAccessDeniedError):
+            engine.get_or_create_conversation(owner_id=owner_b, contact_id=contact_id_a)
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM conversations WHERE contact_id = %s", (contact_id_a,),
+                )
+                assert cur.fetchone()[0] == 0  # nimic scris pentru incercarea lui B
+
+    def test_contact_id_inexistent_ridica_access_denied_pe_postgres(self):
+        owner_id = _create_user("conv-engine-no-contact")
+        engine = ConversationEngine()
+
+        with pytest.raises(ConversationAccessDeniedError):
+            engine.get_or_create_conversation(owner_id=owner_id, contact_id=uuid4())
+
+    def test_conversatie_rezolvata_nu_blocheaza_creare_noua(self):
+        """
+        O conversatie RESOLVED nu conteaza ca 'deschisa' — un apel nou
+        pentru acelasi contact creeaza o conversatie noua, distincta.
+        """
+        owner_id = _create_user("conv-engine-resolved")
+        contact_id = self._create_contact(owner_id)
+        engine = ConversationEngine()
+
+        first = engine.get_or_create_conversation(owner_id=owner_id, contact_id=contact_id)
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET status = 'RESOLVED' WHERE id = %s", (first.id,),
+                )
+
+        second = engine.get_or_create_conversation(owner_id=owner_id, contact_id=contact_id)
+
+        assert second.id != first.id
+        assert second.status == "INITIATED"
+
+    def test_evenimentul_conversation_created_e_scris_in_events(self):
+        owner_id = _create_user("conv-engine-event")
+        contact_id = self._create_contact(owner_id)
+        engine = ConversationEngine()
+
+        conversation = engine.get_or_create_conversation(owner_id=owner_id, contact_id=contact_id)
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT event_name, target_object FROM events WHERE target_object_id = %s",
+                    (conversation.id,),
+                )
+                row = cur.fetchone()
+        assert row == ("ConversationCreated", "conversation")
