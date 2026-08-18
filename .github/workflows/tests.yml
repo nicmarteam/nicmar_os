@@ -28,6 +28,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:nicmar_test@localhost:5432/nicmar_os_ci
+      JWT_SECRET_KEY: ci-test-secret-nu-e-folosit-in-productie-minim-32-bytes
 
     steps:
       - name: Checkout cod
