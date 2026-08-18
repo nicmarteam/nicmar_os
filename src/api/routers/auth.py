@@ -7,11 +7,28 @@ celelalte routere) e o dependency, nu un endpoint propriu.
 
 from fastapi import APIRouter, HTTPException, Request
 
-from src.api.schemas import LoginRequest, TokenResponse
+from src.api.schemas import LoginRequest, TokenResponse, RegisterRequest, RegisterResponse
 from src.auth.rate_limit import login_rate_limiter
 from src.auth.service import authenticate, InvalidCredentialsError
+from src.auth.registration import register_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+
+@router.post("/register", response_model=RegisterResponse, status_code=201)
+def register(body: RegisterRequest):
+    """
+    Creează un utilizator nou (Auth Registration v1, `30-auth-register-contract.md`).
+
+    Nu returnează JWT — derivat explicit din criteriul de acceptare
+    stabilit (register → user creat → ... → login separat → JWT).
+    Pentru autentificare, apelantul face un request separat la `/login`.
+
+    409 ALREADY_EXISTS dacă emailul există deja — propagat din
+    `UniqueViolation`, prins de handler-ul global (`exception_handlers.py`).
+    """
+    user = register_user(email=body.email, password=body.password, full_name=body.full_name)
+    return RegisterResponse(id=user.id, email=user.email, full_name=user.full_name, role=user.role)
 
 
 @router.post("/login", response_model=TokenResponse)
