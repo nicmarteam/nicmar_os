@@ -80,11 +80,13 @@ def test_contine_endpoint_confirm(workbench_content):
 
 def test_toate_fetch_urile_folosesc_doar_api_v1(workbench_content):
     """
-    Niciun fetch() nu tinteste altceva decat /api/v1/... — Workbench-ul
-    nu poate ocoli API-ul catre un endpoint Python intern sau alta cale.
+    Niciun fetch()/apiFetch() nu tinteste altceva decat /api/v1/... —
+    Workbench-ul nu poate ocoli API-ul catre un endpoint Python intern
+    sau alta cale. Regex-ul prinde ambele forme (fetch si apiFetch,
+    ambele contin substring-ul "etch(").
     """
-    fetch_calls = re.findall(r"fetch\(\s*[`'\"]([^`'\"]+)[`'\"]", workbench_content)
-    assert len(fetch_calls) >= 5, f"Prea puține apeluri fetch() găsite: {fetch_calls}"
+    fetch_calls = re.findall(r"etch\(\s*[`'\"]([^`'\"]+)[`'\"]", workbench_content)
+    assert len(fetch_calls) >= 5, f"Prea puține apeluri fetch()/apiFetch() găsite: {fetch_calls}"
     for url in fetch_calls:
         assert "/api/v1/" in url, f"fetch() către un endpoint neconform: {url}"
 
