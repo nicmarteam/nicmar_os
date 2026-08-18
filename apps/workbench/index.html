@@ -254,6 +254,27 @@
     </div>
   </section>
 
+  <!-- ZONA FOLLOW-UP — Decizia 36 -->
+  <section class="panel disabled" id="panel-followup">
+    <h2><span class="step-no">•</span> Follow-Up</h2>
+
+    <label for="followup-notes-input">Notes (opțional)</label>
+    <textarea id="followup-notes-input" placeholder="Detalii despre follow-up..."></textarea>
+
+    <label for="followup-scheduled-input" style="margin-top:10px;">Scheduled at (opțional)</label>
+    <input type="datetime-local" id="followup-scheduled-input">
+
+    <div style="margin-top:10px;">
+      <button id="create-followup-btn" onclick="createFollowUp()">Creează Follow-Up</button>
+    </div>
+    <div class="status-line" id="followup-status"></div>
+
+    <div style="margin-top:16px;">
+      <p class="status-line">Follow-Up-uri în așteptare:</p>
+      <div id="followups-list"></div>
+    </div>
+  </section>
+
   <!-- FAZA 1 — ANALIZĂ — sectiunea 2.2 -->
   <section class="panel disabled" id="panel-analyze">
     <h2><span class="step-no">1</span> Analizează obiecția</h2>
@@ -331,6 +352,7 @@
       setPanelEnabled("panel-analyze", false);
       setPanelEnabled("panel-prepare", false);
       setPanelEnabled("panel-confirm", false);
+      setPanelEnabled("panel-followup", false);
       throw new Error("Sesiunea a expirat sau tokenul e invalid — autentifică-te din nou.");
     }
 
@@ -466,6 +488,125 @@
       statusEl.textContent = "";
       document.getElementById("conversation-status-box").classList.remove("hidden");
       setPanelEnabled("panel-analyze", true);
+      setPanelEnabled("panel-followup", true);
+      await loadFollowUps();
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // ZONA FOLLOW-UP — Decizia 36
+  //
+  // Regula de siguranta (contract sectiunea 4): crearea e posibila
+  // DOAR daca exista currentContactId SI currentConversationId — ambele,
+  // reutilizate din Zona Contact & Conversatie, nimic nou construit.
+  // ------------------------------------------------------------------
+  async function createFollowUp() {
+    const statusEl = document.getElementById("followup-status");
+
+    if (!currentContactId || !currentConversationId) {
+      statusEl.textContent = "Selectează mai întâi un contact și o conversație.";
+      return;
+    }
+
+    const notesInput = document.getElementById("followup-notes-input");
+    const scheduledInput = document.getElementById("followup-scheduled-input");
+
+    // FOLLOWUP_PAYLOAD_START
+    const followupPayload = {
+      contact_id: currentContactId,
+      conversation_id: currentConversationId,
+      notes: notesInput.value || null,
+      scheduled_at: scheduledInput.value || null,
+    };
+    // FOLLOWUP_PAYLOAD_END
+
+    try {
+      await apiFetch("/api/v1/followups", {
+        method: "POST",
+        body: JSON.stringify(followupPayload),
+      });
+      notesInput.value = "";
+      scheduledInput.value = "";
+      statusEl.textContent = "";
+      await loadFollowUps();
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function loadFollowUps() {
+    const statusEl = document.getElementById("followup-status");
+    try {
+      const followups = await apiFetch("/api/v1/followups", { method: "GET" });
+      const listEl = document.getElementById("followups-list");
+      listEl.innerHTML = "";
+      followups.forEach(function (followup) {
+        const card = document.createElement("div");
+        card.className = "variant-card";
+        card.innerHTML =
+          "<div class=\"label\">Contact: " + escapeHtml(followup.contact_id) + "</div>" +
+          "<div class=\"text\">Conversație: " + escapeHtml(followup.conversation_id || "-") + "</div>";
+
+        const actions = document.createElement("div");
+        actions.style.marginTop = "8px";
+
+        const completeBtn = document.createElement("button");
+        completeBtn.textContent = "Finalizează";
+        completeBtn.onclick = function () { completeFollowUp(followup.id); };
+
+        const postponeBtn = document.createElement("button");
+        postponeBtn.textContent = "Amână";
+        postponeBtn.className = "secondary";
+        postponeBtn.style.marginLeft = "6px";
+        postponeBtn.onclick = function () { postponeFollowUp(followup.id); };
+
+        const rescheduleBtn = document.createElement("button");
+        rescheduleBtn.textContent = "Reprogramează";
+        rescheduleBtn.className = "secondary";
+        rescheduleBtn.style.marginLeft = "6px";
+        rescheduleBtn.onclick = function () { rescheduleFollowUp(followup.id); };
+
+        actions.appendChild(completeBtn);
+        actions.appendChild(postponeBtn);
+        actions.appendChild(rescheduleBtn);
+        card.appendChild(actions);
+        listEl.appendChild(card);
+      });
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function completeFollowUp(followupId) {
+    const statusEl = document.getElementById("followup-status");
+    try {
+      await apiFetch(`/api/v1/followups/${followupId}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ confirmed: true }),
+      });
+      await loadFollowUps();
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function postponeFollowUp(followupId) {
+    const statusEl = document.getElementById("followup-status");
+    try {
+      await apiFetch(`/api/v1/followups/${followupId}/postpone`, { method: "POST" });
+      await loadFollowUps();
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function rescheduleFollowUp(followupId) {
+    const statusEl = document.getElementById("followup-status");
+    try {
+      await apiFetch(`/api/v1/followups/${followupId}/reschedule`, { method: "POST" });
+      await loadFollowUps();
     } catch (e) {
       statusEl.textContent = e.message;
     }
