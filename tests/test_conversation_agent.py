@@ -1,7 +1,10 @@
 """
 Teste RED pentru ConversationAgent v1 — cu mock pe ObjectionEngine, fara DB reala.
 
-Sursa: 22-conversation-agent-contract.md.
+Sursa: 22-conversation-agent-contract.md, actualizat la Decizia 33
+(33-conversation-objection-linkage-contract.md) — agentul capata a doua
+dependinta, ConversationEngine, pentru verificarea de ownership a
+conversation_id inainte de create_objection().
 """
 
 from unittest.mock import MagicMock
@@ -11,6 +14,9 @@ import pytest
 
 from src.engines.objection.objection_engine import Objection, SubmitResponseResult
 from src.engines.objection.safety_validation import ValidationResult
+from src.engines.conversation.conversation_engine import (
+    Conversation, ConversationAccessDeniedError,
+)
 from src.agents.conversation.conversation_agent import (
     AnalyzeObjectionResult,
     ConfirmResponseResult,
@@ -25,8 +31,15 @@ def fake_engine():
 
 
 @pytest.fixture
-def agent(fake_engine):
-    return ConversationAgent(objection_engine=fake_engine)
+def fake_conversation_engine():
+    return MagicMock()
+
+
+@pytest.fixture
+def agent(fake_engine, fake_conversation_engine):
+    return ConversationAgent(
+        objection_engine=fake_engine, conversation_engine=fake_conversation_engine,
+    )
 
 
 # ----------------------------------------------------------------------
@@ -181,6 +194,84 @@ def test_prepare_response_options_propaga_fk_violation(agent, fake_engine):
         agent.prepare_response_options(
             owner_id=uuid4(), objection_text="text", objection_category="PRET",
         )
+
+
+# ----------------------------------------------------------------------
+# prepare_response_options() — Decizia 33: verificare ownership pe
+# conversation_id, PRIN ConversationEngine, ÎNAINTE de create_objection()
+# ----------------------------------------------------------------------
+
+
+def test_prepare_response_options_fara_conversation_id_nu_verifica_ownership(
+    agent, fake_engine, fake_conversation_engine,
+):
+    """conversation_id=None -> fluxul existent, ZERO apel la conversation_engine."""
+    owner_id = uuid4()
+    objection = Objection(
+        id=uuid4(), owner_id=owner_id, conversation_id=None,
+        objection_category="PRET", objection_text="e scump", resolution_status="OPEN",
+    )
+    fake_engine.create_objection.return_value = objection
+    fake_engine.get_variants.return_value = {"CALDA": "a", "DIRECTA": "b", "INTREBARE": "c"}
+
+    agent.prepare_response_options(
+        owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+    )
+
+    fake_conversation_engine.get_conversation.assert_not_called()
+
+
+def test_prepare_response_options_cu_conversation_id_verifica_ownership_intai(
+    agent, fake_engine, fake_conversation_engine,
+):
+    """conversation_id transmis -> get_conversation() apelat ÎNAINTE de create_objection()."""
+    owner_id = uuid4()
+    conversation_id = uuid4()
+    call_order = []
+
+    fake_conversation_engine.get_conversation.side_effect = (
+        lambda *a, **k: call_order.append("get_conversation")
+        or Conversation(id=conversation_id, owner_id=owner_id, contact_id=uuid4(),
+                         channel="WHATSAPP", status="ACTIVE")
+    )
+    objection = Objection(
+        id=uuid4(), owner_id=owner_id, conversation_id=conversation_id,
+        objection_category="PRET", objection_text="e scump", resolution_status="OPEN",
+    )
+    fake_engine.create_objection.side_effect = (
+        lambda *a, **k: call_order.append("create_objection") or objection
+    )
+    fake_engine.get_variants.return_value = {"CALDA": "a", "DIRECTA": "b", "INTREBARE": "c"}
+
+    agent.prepare_response_options(
+        owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        conversation_id=conversation_id,
+    )
+
+    assert call_order == ["get_conversation", "create_objection"]
+    fake_conversation_engine.get_conversation.assert_called_once_with(
+        conversation_id=conversation_id, owner_id=owner_id,
+    )
+
+
+def test_prepare_response_options_conversation_id_altui_owner_ridica_access_denied(
+    agent, fake_engine, fake_conversation_engine,
+):
+    """
+    ConversationAccessDeniedError din get_conversation() propaga neprinsa,
+    ȘI create_objection() NU e apelat deloc — ZERO INSERT.
+    """
+    fake_conversation_engine.get_conversation.side_effect = ConversationAccessDeniedError(
+        "Conversația nu există sau nu aparține acestui owner."
+    )
+
+    with pytest.raises(ConversationAccessDeniedError):
+        agent.prepare_response_options(
+            owner_id=uuid4(), objection_text="text", objection_category="PRET",
+            conversation_id=uuid4(),
+        )
+
+    fake_engine.create_objection.assert_not_called()
 
 
 # ----------------------------------------------------------------------
