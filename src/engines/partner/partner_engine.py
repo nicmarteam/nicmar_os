@@ -64,9 +64,11 @@ class PartnerDiagnosticAlreadyGeneratedError(Exception):
 
 class PartnerAccessDeniedError(Exception):
     """
-    Ridicată dacă partner_id nu există SAU nu aparține owner_id-ului dat.
+    Ridicată dacă partner_id nu există SAU nu aparține owner_id-ului dat,
+    SAU (Decizia 32) dacă contact_id nu există SAU nu aparține
+    owner_id-ului dat, la creare.
 
-    Mesaj identic pentru ambele cazuri — previne enumerare de ID-uri.
+    Mesaj identic pentru toate cazurile — previne enumerare de ID-uri.
     Descoperit prin Security Isolation Audit (12 august 2026, testat
     pe PostgreSQL real): nicio metodă de scriere nu verifica anterior
     că partner_id aparține owner_id-ului apelant — un lider putea
@@ -89,6 +91,28 @@ class PartnerDiagnostic:
     owner_id: UUID
     diagnostic_type: str
     message: str
+
+
+@dataclass(frozen=True)
+class Partner:
+    """Reprezentarea unui partener, așa cum e citit din `partners`.
+
+    Attributes:
+        id: Identificatorul generat de PostgreSQL.
+        owner_id: Liderul care deține partenerul.
+        contact_id: Contactul din care a fost creat — `UNIQUE`, un
+            contact devine partener cel mult o dată.
+        status: `'ACTIVATED'` la creare (Decizia 32) — nu afectează
+            eligibilitatea pentru diagnostic (asta vine din RuleEngine).
+        partner_level: `'BRONZE'` implicit (DB `DEFAULT`), nesetat
+            explicit de acest cod.
+    """
+
+    id: UUID
+    owner_id: UUID
+    contact_id: UUID
+    status: str
+    partner_level: str
 
 
 class PartnerEngine:
@@ -124,6 +148,61 @@ class PartnerEngine:
                     raise PartnerAccessDeniedError(
                         f"Partner {partner_id} nu există sau nu aparține acestui owner."
                     )
+
+    # ------------------------------------------------------------------
+    # Creare — Decizia 32, 32-partner-create-contract.md
+    # ------------------------------------------------------------------
+
+    def create_partner(self, owner_id: UUID, contact_id: UUID) -> Partner:
+        """Creează un partener nou, dintr-un contact existent.
+
+        `status` NU e parametru — hardcodat `'ACTIVATED'` server-side.
+        `partner_level` NU e setat aici — DB aplică `DEFAULT 'BRONZE'`.
+
+        Args:
+            owner_id: Liderul autentificat — din `CurrentUser.id` (JWT).
+            contact_id: Contactul din care se creează partenerul —
+                verificat că aparține `owner_id` ÎNAINTE de `INSERT`
+                (contract secțiunea 2 — FK-ul singur nu garantează
+                proprietatea, la fel ca la `ConversationEngine`).
+
+        Returns:
+            `Partner` complet, construit din valorile `RETURNING`.
+
+        Raises:
+            PartnerAccessDeniedError: `contact_id` nu există sau nu
+                aparține `owner_id`-ului dat.
+            psycopg.errors.UniqueViolation: `contact_id` e deja partener
+                — propagă neprinsă, prinsă de handler-ul global existent
+                (`409 ALREADY_EXISTS`, înregistrat la Decizia 30).
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM contacts WHERE id = %s AND owner_id = %s",
+                    (contact_id, owner_id),
+                )
+                if cur.fetchone() is None:
+                    raise PartnerAccessDeniedError(
+                        f"Contact {contact_id} nu există sau nu aparține acestui owner."
+                    )
+
+                cur.execute(
+                    """
+                    INSERT INTO partners (owner_id, contact_id, status)
+                    VALUES (%s, %s, 'ACTIVATED')
+                    RETURNING id, owner_id, contact_id, status, partner_level
+                    """,
+                    (owner_id, contact_id),
+                )
+                row = cur.fetchone()
+
+        partner = Partner(
+            id=row[0], owner_id=row[1], contact_id=row[2],
+            status=row[3], partner_level=row[4],
+        )
+        self._emit_event("PartnerCreated", partner.id, {"contact_id": str(contact_id)})
+        return partner
 
     # ------------------------------------------------------------------
     # Diagnostic — trece prin RuleEngine, tip ales de apelant
