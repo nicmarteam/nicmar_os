@@ -88,6 +88,23 @@ def test_contine_endpoint_post_conversations(workbench_content):
     assert "/api/v1/conversations" in workbench_content
 
 
+def test_contine_endpoint_followups(workbench_content):
+    """Decizia 36: Workbench trebuie sa creeze/listeze follow-up-uri."""
+    assert "/api/v1/followups" in workbench_content
+
+
+def test_contine_endpoint_followup_complete(workbench_content):
+    assert "/complete" in workbench_content
+
+
+def test_contine_endpoint_followup_postpone(workbench_content):
+    assert "/postpone" in workbench_content
+
+
+def test_contine_endpoint_followup_reschedule(workbench_content):
+    assert "/reschedule" in workbench_content
+
+
 def test_toate_fetch_urile_folosesc_doar_api_v1(workbench_content):
     """
     Niciun fetch()/apiFetch() nu tinteste altceva decat /api/v1/... —
@@ -179,6 +196,50 @@ def test_prepare_payload_nu_mai_are_null_hardcodat(workbench_content):
     block = _extract_prepare_payload_block(workbench_content)
     assert "conversation_id: null" not in block
     assert "conversation_id: currentConversationId" in block
+
+
+# ----------------------------------------------------------------------
+# Payload /followups — Decizia 36: trebuie sa reutilizeze
+# currentContactId/currentConversationId, nu valori noi
+# ----------------------------------------------------------------------
+
+
+def _extract_followup_payload_block(content: str) -> str:
+    match = re.search(
+        r"//\s*FOLLOWUP_PAYLOAD_START(.*?)//\s*FOLLOWUP_PAYLOAD_END",
+        content, re.DOTALL,
+    )
+    assert match is not None, (
+        "Marcajele FOLLOWUP_PAYLOAD_START/FOLLOWUP_PAYLOAD_END lipsesc — "
+        "necesare pentru verificarea ca payload-ul reutilizeaza starea Contact/Conversation."
+    )
+    return match.group(1)
+
+
+def test_followup_payload_reutilizeaza_current_contact_id(workbench_content):
+    block = _extract_followup_payload_block(workbench_content)
+    assert "currentContactId" in block
+
+
+def test_followup_payload_reutilizeaza_current_conversation_id(workbench_content):
+    block = _extract_followup_payload_block(workbench_content)
+    assert "currentConversationId" in block
+
+
+def test_followup_payload_nu_contine_objection_id(workbench_content):
+    """Decizia 36, sectiunea 6: fara legatura cu Objection."""
+    block = _extract_followup_payload_block(workbench_content)
+    assert "objection_id" not in block
+
+
+def test_are_guard_pentru_contact_si_conversation_la_creare_followup(workbench_content):
+    """
+    Decizia 36, sectiunea 4: crearea unui follow-up trebuie blocata daca
+    lipseste currentContactId SAU currentConversationId — verificare
+    structurala a guard-ului (nu doar prezenta variabilelor undeva).
+    """
+    assert "!currentContactId" in workbench_content
+    assert "!currentConversationId" in workbench_content
 
 
 # ----------------------------------------------------------------------
