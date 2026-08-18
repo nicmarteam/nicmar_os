@@ -2,6 +2,7 @@
 Schema Pydantic pentru API — Mission, FollowUp, Partner, Objections și Auth.
 """
 
+from datetime import datetime
 from typing import Dict, List, Optional
 from uuid import UUID
 
@@ -197,3 +198,31 @@ class PartnerResponse(BaseModel):
     contact_id: UUID
     status: str
     partner_level: str
+
+
+# ------------------------------------------------------------------
+# Conversation-Objection linkage — sursă: 33-conversation-objection-linkage-contract.md
+# ------------------------------------------------------------------
+
+class CreateConversationRequest(BaseModel):
+    contact_id: UUID
+
+
+class ConversationResponse(BaseModel):
+    id: UUID
+    owner_id: UUID
+    contact_id: UUID
+    channel: str
+    status: str
+
+
+class ContactSummaryResponse(BaseModel):
+    contact_id: UUID
+    full_name: str
+    status: str
+    last_followup_at: Optional[datetime]
+    last_followup_status: Optional[str]
+    converted_to: Optional[str]
+    pdi: Optional[float]
+    pip: Optional[float]
+    reason: str
