@@ -5,7 +5,7 @@ Schema Pydantic pentru API — Mission, FollowUp, Partner, Objections și Auth.
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class CreateMissionRequest(BaseModel):
@@ -43,6 +43,31 @@ class ErrorResponse(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class RegisterRequest(BaseModel):
+    """Sursă: 30-auth-register-contract.md, secțiunile 3-4."""
+
+    email: str
+    password: str
+    full_name: str
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password_length(cls, v: str) -> str:
+        byte_length = len(v.encode("utf-8"))
+        if len(v) < 8:
+            raise ValueError("Parola trebuie să aibă minimum 8 caractere.")
+        if byte_length > 72:
+            raise ValueError("Parola nu poate depăși 72 de bytes (UTF-8).")
+        return v
+
+
+class RegisterResponse(BaseModel):
+    id: UUID
+    email: str
+    full_name: str
+    role: str
 
 
 class TokenResponse(BaseModel):
