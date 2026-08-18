@@ -147,6 +147,49 @@ class ConversationEngine:
         self._emit_event("ConversationCreated", conversation.id, {"contact_id": str(contact_id)})
         return conversation
 
+    def get_conversation(self, conversation_id: UUID, owner_id: UUID) -> Conversation:
+        """Citește o conversație existentă (Decizia 33, `33-conversation-objection-linkage-contract.md`).
+
+        Mirror exact al `ObjectionEngine.get_objection()` (Decizia 8A).
+        Spre deosebire de `get_or_create_conversation()`, NU filtrează
+        după status — orice conversație a owner-ului, indiferent de
+        stare, poate fi citită (folosit pentru verificarea de ownership
+        înainte de a lega o obiecție de o conversație, indiferent dacă
+        acea conversație e încă activă sau deja rezolvată/arhivată).
+
+        Args:
+            conversation_id: Identificatorul conversației de citit.
+            owner_id: Identificatorul liderului autentificat — filtrare
+                obligatorie. Existența `conversation_id` singură NU
+                acordă acces.
+
+        Returns:
+            `Conversation` complet, construit din valorile citite.
+
+        Raises:
+            ConversationAccessDeniedError: rândul nu există SAU aparține
+                altui `owner_id` — mesaj identic pentru ambele cazuri,
+                previne enumerare.
+        """
+        query = """
+            SELECT id, owner_id, contact_id, channel, status
+            FROM conversations
+            WHERE id = %s AND owner_id = %s
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (conversation_id, owner_id))
+                row = cur.fetchone()
+
+        if row is None:
+            raise ConversationAccessDeniedError(
+                f"Conversația {conversation_id} nu există sau nu aparține acestui owner."
+            )
+
+        return Conversation(
+            id=row[0], owner_id=row[1], contact_id=row[2], channel=row[3], status=row[4],
+        )
+
     def _emit_event(self, event_name: str, target_object_id: UUID, payload: dict) -> None:
         """Scrie evenimentul în tabelul generic `events` (pattern identic cu FollowUpEngine)."""
         from psycopg.types.json import Json
