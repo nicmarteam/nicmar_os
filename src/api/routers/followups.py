@@ -45,7 +45,8 @@ def create_followup(
 ):
     """Creează follow-up pentru utilizatorul autentificat."""
     followup = followup_engine.create_from_trigger(
-        current_user.id, body.contact_id, body.conversation_id
+        current_user.id, body.contact_id, body.conversation_id,
+        notes=body.notes, scheduled_at=body.scheduled_at,
     )
     return _to_response(followup)
 
