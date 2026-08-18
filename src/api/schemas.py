@@ -83,6 +83,8 @@ class TokenResponse(BaseModel):
 class CreateFollowUpRequest(BaseModel):
     contact_id: UUID
     conversation_id: UUID
+    notes: Optional[str] = None
+    scheduled_at: Optional[str] = None
 
 
 class FollowUpResponse(BaseModel):
