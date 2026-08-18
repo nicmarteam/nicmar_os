@@ -183,21 +183,27 @@ class ConversationAgent:
 
     def confirm_response(
         self,
-        objection: Objection,
+        objection_id: UUID,
+        owner_id: UUID,
         response_text: str,
         response_variant_used: str,
     ) -> ConfirmResponseResult:
         """Confirmă și persistă răspunsul final ales/editat de lider.
 
-        `objection_id`, `owner_id`, `objection_category`, `objection_text`
-        vin EXCLUSIV din `objection` (obiectul persistent obținut la pasul
-        `prepare_response_options()`) — nu sunt reintroduse ca input separat
-        de UI/lider, evitând inconsecvența între ce s-a clasificat/persistat
-        și ce se validează acum.
+        Semnătură revizuită (Decizia 8A, `25-get-objection-contract.md`):
+        primește scalari (`objection_id`, `owner_id`), nu `Objection` complet.
+        Motiv: HTTP e stateless între `prepare_response_options()` și
+        `confirm_response()` — un client nesigur nu poate fi sursa pentru
+        `objection_category`/`objection_text` (ar putea trimite o categorie
+        falsă, ca să ocolească o regulă de Safety Validation). Această metodă
+        re-citește `Objection` fresh din DB prin
+        `ObjectionEngine.get_objection()`, folosind `owner_id` — care, la
+        rândul lui, trebuie să vină din `CurrentUser.id` (JWT), niciodată din
+        input liber al clientului.
 
         Args:
-            objection: `Objection`-ul complet, așa cum a fost returnat de
-                `prepare_response_options()`.
+            objection_id: Identificatorul obiecției — din client (path/body).
+            owner_id: Liderul autentificat — din `CurrentUser.id` (JWT).
             response_text: Textul final al răspunsului, ales sau editat
                 de lider din `variants`.
             response_variant_used: Cheia variantei ALESE INIȚIAL
@@ -210,9 +216,13 @@ class ConversationAgent:
 
         Raises:
             ObjectionNotFoundError: propagată neprinsă din
-                `ObjectionEngine.submit_response()` — `ConversationAgent`
-                nu o traduce.
+                `ObjectionEngine.get_objection()` (rând inexistent sau owner
+                greșit) SAU din `ObjectionEngine.submit_response()` —
+                `ConversationAgent` nu o traduce în niciun caz.
         """
+        objection = self.objection_engine.get_objection(
+            objection_id=objection_id, owner_id=owner_id,
+        )
         result = self.objection_engine.submit_response(
             objection_id=objection.id,
             owner_id=objection.owner_id,
