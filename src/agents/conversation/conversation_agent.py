@@ -31,6 +31,7 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 from src.engines.objection.objection_engine import Objection, ObjectionEngine
+from src.engines.conversation.conversation_engine import ConversationEngine
 
 
 @dataclass(frozen=True)
@@ -90,8 +91,9 @@ class ConversationAgent:
     de domeniu proprie — deleagă integral la `ObjectionEngine`.
     """
 
-    def __init__(self, objection_engine: ObjectionEngine):
+    def __init__(self, objection_engine: ObjectionEngine, conversation_engine: ConversationEngine):
         self.objection_engine = objection_engine
+        self.conversation_engine = conversation_engine
 
     # ------------------------------------------------------------------
     # Pasul 0 — Selecție manuală, fără DB (Decizia 6)
@@ -156,7 +158,9 @@ class ConversationAgent:
             objection_text: Textul liber al obiecției.
             objection_category: Categoria — din `AnalyzeObjectionResult`
                 (pasul 1) sau alegerea manuală a liderului.
-            conversation_id: Conversația asociată, opțional.
+            conversation_id: Conversația asociată, opțional. Dacă
+                transmis, verificat că aparține owner_id înainte de
+                orice scriere (Decizia 33).
 
         Returns:
             `PrepareResponseOptionsResult` cu `Objection`-ul complet și
@@ -165,9 +169,18 @@ class ConversationAgent:
         Raises:
             ValueError: categorie invalidă — propagată neprinsă din
                 `create_objection()`.
-            psycopg.errors.ForeignKeyViolation: `owner_id`/`conversation_id`
+            psycopg.errors.ForeignKeyViolation: `owner_id`
                 invalid — propagată neprinsă, consecvent cu `20-2A`.
+            ConversationAccessDeniedError: `conversation_id` transmis nu
+                există sau nu aparține `owner_id` — propagată neprinsă
+                din `ConversationEngine.get_conversation()` (Decizia 33).
+                `create_objection()` NU se apelă în acest caz.
         """
+        if conversation_id is not None:
+            self.conversation_engine.get_conversation(
+                conversation_id=conversation_id, owner_id=owner_id,
+            )
+
         objection = self.objection_engine.create_objection(
             owner_id=owner_id,
             objection_text=objection_text,
