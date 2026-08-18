@@ -224,8 +224,18 @@ def test_prepare_categorie_invalida_returneaza_400_invalid_category(client):
     assert r.json()["error_code"] == "INVALID_CATEGORY"
 
 
-def test_prepare_conversation_id_inexistent_returneaza_400_invalid_reference(client):
-    """Decizia 26B: ForeignKeyViolation (conversation_id inexistent) -> 400 INVALID_REFERENCE."""
+def test_prepare_conversation_id_inexistent_returneaza_403_access_denied(client):
+    """
+    ACTUALIZAT la Decizia 33 (33-conversation-objection-linkage-contract.md):
+    inainte, conversation_id inexistent trecea direct la create_objection()
+    si esua cu ForeignKeyViolation -> 400 INVALID_REFERENCE (Decizia 26B).
+    Acum, ConversationAgent verifica ownership-ul PRIN
+    ConversationEngine.get_conversation() INAINTE de create_objection() —
+    un conversation_id inexistent e prins mai devreme, ca "nu exista sau
+    nu apartine acestui owner" -> 403 ACCESS_DENIED, consecvent cu
+    principiul anti-enumerare folosit peste tot in proiect (nu se mai
+    distinge "nu exista" de "apartine altcuiva").
+    """
     _, headers = _create_authenticated_user(client, "objections-bad-conversation")
 
     r = client.post(
@@ -237,5 +247,5 @@ def test_prepare_conversation_id_inexistent_returneaza_400_invalid_reference(cli
         headers=headers,
     )
 
-    assert r.status_code == 400
-    assert r.json()["error_code"] == "INVALID_REFERENCE"
+    assert r.status_code == 403
+    assert r.json()["error_code"] == "ACCESS_DENIED"
