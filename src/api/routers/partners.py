@@ -12,11 +12,34 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_partner_agent
-from src.api.schemas import DiagnosticRequest, DiagnosticResponse, SendRequest, PartnerScoresResponse
+from src.api.schemas import (
+    DiagnosticRequest, DiagnosticResponse, SendRequest, PartnerScoresResponse,
+    CreatePartnerRequest, PartnerResponse,
+)
 from src.auth.dependencies import get_current_user, CurrentUser
 from src.agents.partner.partner_agent import PartnerAgent
 
 router = APIRouter(prefix="/api/v1/partners", tags=["partners"])
+
+
+@router.post("", response_model=PartnerResponse, status_code=201)
+def create_partner(
+    body: CreatePartnerRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    partner_agent: PartnerAgent = Depends(get_partner_agent),
+):
+    """
+    Creează un partener nou, dintr-un contact existent al liderului.
+
+    owner_id vine exclusiv din current_user.id — niciodată din body.
+    status/partner_level NU sunt acceptate din body — hardcodate
+    server-side (ACTIVATED / DEFAULT BRONZE).
+    """
+    partner = partner_agent.create_partner(current_user.id, body.contact_id)
+    return PartnerResponse(
+        id=partner.id, owner_id=partner.owner_id, contact_id=partner.contact_id,
+        status=partner.status, partner_level=partner.partner_level,
+    )
 
 
 @router.post("/{partner_id}/diagnostic", response_model=DiagnosticResponse, status_code=201)
