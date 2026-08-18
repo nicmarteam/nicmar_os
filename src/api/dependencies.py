@@ -15,6 +15,8 @@ from src.agents.partner.partner_agent import PartnerAgent
 from src.engines.objection.objection_engine import ObjectionEngine
 from src.agents.conversation.conversation_agent import ConversationAgent
 from src.engines.contact.contact_engine import ContactEngine
+from src.agents.contact.contact_agent import ContactAgent
+from src.engines.conversation.conversation_engine import ConversationEngine
 
 
 def get_mission_agent() -> MissionAgent:
@@ -50,18 +52,32 @@ def get_objection_engine() -> ObjectionEngine:
     return ObjectionEngine()
 
 
+def get_conversation_engine() -> ConversationEngine:
+    """Decizia 33, `33-conversation-objection-linkage-contract.md` — fără dependințe proprii."""
+    return ConversationEngine()
+
+
 def get_conversation_agent(
     objection_engine: ObjectionEngine = Depends(get_objection_engine),
+    conversation_engine: ConversationEngine = Depends(get_conversation_engine),
 ) -> ConversationAgent:
     """
     Decizia 7 — chaining real, spre deosebire de wiring-ul independent de
     mai sus (Mission/FollowUp/Partner). `Depends(get_objection_engine)`
     garantează, în cadrul aceluiași request, aceeași instanță de
     `ObjectionEngine` pentru orice alt endpoint care ar cere-o separat.
+
+    Decizia 33: a doua dependință, `ConversationEngine`, chaining identic —
+    folosită pentru verificarea de ownership a `conversation_id`.
     """
-    return ConversationAgent(objection_engine=objection_engine)
+    return ConversationAgent(objection_engine=objection_engine, conversation_engine=conversation_engine)
 
 
 def get_contact_engine() -> ContactEngine:
     """Decizia 31, `31-contact-create-contract.md` — fără dependințe proprii."""
     return ContactEngine()
+
+
+def get_contact_agent() -> ContactAgent:
+    """Decizia 33, `33-conversation-objection-linkage-contract.md` — expune ContactAgent, deja existent."""
+    return ContactAgent()
