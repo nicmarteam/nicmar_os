@@ -224,6 +224,81 @@ def test_channel_explicit_transmis_corect(engine):
 
 
 # ----------------------------------------------------------------------
+# get_conversation() — Decizia 33, mirror get_objection()
+# ----------------------------------------------------------------------
+
+
+def test_get_conversation_returneaza_conversatie_completa(engine):
+    owner_id = uuid4()
+    contact_id = uuid4()
+    conversation_id = uuid4()
+
+    with patch("src.engines.conversation.conversation_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor([
+            (conversation_id, owner_id, contact_id, "WHATSAPP", "ACTIVE"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        conversation = engine.get_conversation(conversation_id=conversation_id, owner_id=owner_id)
+
+        assert conversation == Conversation(
+            id=conversation_id, owner_id=owner_id, contact_id=contact_id,
+            channel="WHATSAPP", status="ACTIVE",
+        )
+
+
+def test_get_conversation_filtreaza_owner_id_in_where(engine):
+    owner_id = uuid4()
+
+    with patch("src.engines.conversation.conversation_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor([
+            (uuid4(), owner_id, uuid4(), "WHATSAPP", "RESOLVED"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.get_conversation(conversation_id=uuid4(), owner_id=owner_id)
+
+        executed_sql = mock_cur.execute.call_args[0][0]
+        assert "WHERE" in executed_sql
+        assert "owner_id" in executed_sql
+
+
+def test_get_conversation_inexistenta_ridica_access_denied(engine):
+    with patch("src.engines.conversation.conversation_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor([None])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        with pytest.raises(ConversationAccessDeniedError):
+            engine.get_conversation(conversation_id=uuid4(), owner_id=uuid4())
+
+
+def test_get_conversation_owner_gresit_ridica_aceeasi_eroare(engine):
+    """Identic cu 'nu exista' — previne enumerare."""
+    with patch("src.engines.conversation.conversation_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor([None])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        with pytest.raises(ConversationAccessDeniedError):
+            engine.get_conversation(conversation_id=uuid4(), owner_id=uuid4())
+
+
+def test_get_conversation_nu_filtreaza_dupa_status(engine):
+    """Spre deosebire de get_or_create_conversation, aici orice status e valid."""
+    owner_id = uuid4()
+    conversation_id = uuid4()
+
+    with patch("src.engines.conversation.conversation_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor([
+            (conversation_id, owner_id, uuid4(), "WHATSAPP", "ARCHIVED"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        conversation = engine.get_conversation(conversation_id=conversation_id, owner_id=owner_id)
+
+        assert conversation.status == "ARCHIVED"
+
+
+# ----------------------------------------------------------------------
 # Dataclass Conversation
 # ----------------------------------------------------------------------
 
