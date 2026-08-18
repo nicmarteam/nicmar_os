@@ -158,3 +158,26 @@ class ConfirmResponseResponseSchema(BaseModel):
     persisted: bool
     validation_level: str
     reason: Optional[str]
+
+
+# ------------------------------------------------------------------
+# Contacts — sursă: 31-contact-create-contract.md
+# ------------------------------------------------------------------
+
+class CreateContactRequest(BaseModel):
+    full_name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    source: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class ContactResponse(BaseModel):
+    id: UUID
+    owner_id: UUID
+    full_name: str
+    phone: Optional[str]
+    email: Optional[str]
+    status: str
+    source: Optional[str]
+    metadata: dict
