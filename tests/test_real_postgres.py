@@ -30,6 +30,7 @@ from src.engines.partner.partner_engine import PartnerEngine, PartnerAccessDenie
 from src.agents.partner.partner_agent import PartnerAgent
 from src.agents.contact.contact_agent import ContactAgent
 from src.engines.objection.objection_engine import Objection, ObjectionEngine, ObjectionNotFoundError
+from src.agents.conversation.conversation_agent import ConversationAgent
 
 
 pytestmark = pytest.mark.skipif(
@@ -754,3 +755,119 @@ class TestObjectionEngineOnRealPostgres:
                     (owner_id,),
                 )
                 assert cur.fetchone()[0] == 2
+
+
+class TestConversationAgentOnRealPostgres:
+    """
+    Valideaza orchestrarea completa ConversationAgent -> ObjectionEngine pe
+    PostgreSQL real. Componentele individuale (classify, create_objection,
+    get_variants, submit_response) sunt deja acoperite in
+    TestObjectionEngineOnRealPostgres — aici verificam ca legarea lor prin
+    ConversationAgent produce exact aceeasi persistenta reala, capat la capat.
+    """
+
+    def test_flux_complet_analiza_variante_confirmare_pas_pas(self):
+        """
+        analyze_objection -> prepare_response_options -> confirm_response,
+        cu PASS, verificat direct din tabela objections dupa fiecare pas.
+        """
+        owner_id = _create_user("conv-agent-flow")
+        agent = ConversationAgent(objection_engine=ObjectionEngine())
+
+        # Pasul 1 — analiza, fara nicio scriere
+        analysis = agent.analyze_objection("Nu am timp.")
+        assert analysis.detected_category == "TIMP"
+        assert analysis.needs_manual_selection is False
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM objections WHERE owner_id = %s", (owner_id,))
+                assert cur.fetchone()[0] == 0  # analiza nu a scris nimic
+
+        # Pasul 2 — creare reala + variante
+        prep = agent.prepare_response_options(
+            owner_id=owner_id,
+            objection_text="Nu am timp.",
+            objection_category=analysis.detected_category,
+        )
+        assert prep.objection.id is not None
+        assert prep.objection.resolution_status == "OPEN"
+        assert set(prep.variants.keys()) == {"CALDA", "DIRECTA", "INTREBARE"}
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT objection_category, response_text FROM objections WHERE id = %s",
+                    (prep.objection.id,),
+                )
+                row = cur.fetchone()
+                assert row == ("TIMP", None)  # creat, dar fara raspuns inca
+
+        # Pasul 3 — confirmare, cu obiectul persistent (nu campuri reintroduse)
+        confirmation = agent.confirm_response(
+            objection=prep.objection,
+            response_text=prep.variants["DIRECTA"],
+            response_variant_used="DIRECTA",
+        )
+        assert confirmation.persisted is True
+        assert confirmation.validation_level == "PASS"
+        assert confirmation.reason is None
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT response_text, response_variant_used FROM objections WHERE id = %s",
+                    (prep.objection.id,),
+                )
+                row = cur.fetchone()
+                assert row == (prep.variants["DIRECTA"], "DIRECTA")
+
+    def test_confirm_response_block_nu_scrie_nimic_prin_agent(self):
+        """BLOCK, prin orchestrarea agentului -> nimic persistat, la fel ca ObjectionEngine direct."""
+        owner_id = _create_user("conv-agent-block")
+        agent = ConversationAgent(objection_engine=ObjectionEngine())
+
+        prep = agent.prepare_response_options(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+
+        confirmation = agent.confirm_response(
+            objection=prep.objection,
+            response_text="Îți garantez că vei câștiga bani.",
+            response_variant_used="CALDA",
+        )
+
+        assert confirmation.persisted is False
+        assert confirmation.validation_level == "BLOCK"
+        assert confirmation.reason is not None
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT response_text FROM objections WHERE id = %s", (prep.objection.id,))
+                assert cur.fetchone()[0] is None
+
+    def test_confirm_response_izoleaza_owner_id_prin_agent(self):
+        """Liderul B nu poate confirma un raspuns pe obiectia liderului A, prin agent."""
+        owner_a = _create_user("conv-agent-owner-a")
+        owner_b = _create_user("conv-agent-owner-b")
+        agent = ConversationAgent(objection_engine=ObjectionEngine())
+
+        prep = agent.prepare_response_options(
+            owner_id=owner_a, objection_text="nu am timp", objection_category="TIMP",
+        )
+
+        # objection "apartine" lui owner_a, dar simulam un obiect cu owner_id gresit
+        objection_cu_owner_gresit = Objection(
+            id=prep.objection.id, owner_id=owner_b,
+            conversation_id=prep.objection.conversation_id,
+            objection_category=prep.objection.objection_category,
+            objection_text=prep.objection.objection_text,
+            resolution_status=prep.objection.resolution_status,
+        )
+
+        with pytest.raises(ObjectionNotFoundError):
+            agent.confirm_response(
+                objection=objection_cu_owner_gresit,
+                response_text="Înțeleg, poți începe cu 10 minute pe zi.",
+                response_variant_used="DIRECTA",
+            )
