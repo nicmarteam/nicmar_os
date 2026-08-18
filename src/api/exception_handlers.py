@@ -25,6 +25,7 @@ from src.engines.partner.partner_engine import (
     HumanConfirmationRequiredError as PartnerHumanConfirmationRequiredError,
 )
 from src.engines.objection.objection_engine import ObjectionNotFoundError
+from src.engines.conversation.conversation_engine import ConversationAccessDeniedError
 
 
 def _error_response(status_code: int, error_code: str, message: str) -> JSONResponse:
@@ -48,6 +49,10 @@ ACCESS_DENIED_ERRORS = (
     # deși numele conține "NotFound". Reutilizează categoria existentă,
     # nu introduce una nouă.
     ObjectionNotFoundError,
+    # ConversationAccessDeniedError — Decizia 33: nu era înregistrată
+    # până acum (ConversationEngine nu avea niciun endpoint HTTP înainte
+    # de acest contract). Semantic identică cu restul categoriei.
+    ConversationAccessDeniedError,
 )
 INVALID_TRANSITION_ERRORS = (
     InvalidTransitionError, FollowUpInvalidTransitionError, InvalidDiagnosticTypeError,
