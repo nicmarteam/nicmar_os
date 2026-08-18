@@ -78,6 +78,16 @@ def test_contine_endpoint_confirm(workbench_content):
     assert "/api/v1/objections/confirm" in workbench_content
 
 
+def test_contine_endpoint_get_contacts(workbench_content):
+    """Decizia 34: Workbench trebuie sa incarce lista de contacte."""
+    assert "/api/v1/contacts" in workbench_content
+
+
+def test_contine_endpoint_post_conversations(workbench_content):
+    """Decizia 34: Workbench trebuie sa creeze/obtina conversatia reala."""
+    assert "/api/v1/conversations" in workbench_content
+
+
 def test_toate_fetch_urile_folosesc_doar_api_v1(workbench_content):
     """
     Niciun fetch()/apiFetch() nu tinteste altceva decat /api/v1/... —
@@ -136,6 +146,39 @@ def test_confirm_payload_contine_doar_campurile_permise(workbench_content):
     assert "response_text" in block
     assert "response_variant_used" in block
     assert "objection_id" in block
+
+
+# ----------------------------------------------------------------------
+# Payload /prepare — Decizia 34: conversation_id trebuie sa fie
+# variabila reala (currentConversationId), NU literal null hardcodat
+# ----------------------------------------------------------------------
+
+
+def _extract_prepare_payload_block(content: str) -> str:
+    match = re.search(
+        r"//\s*PREPARE_PAYLOAD_START(.*?)//\s*PREPARE_PAYLOAD_END",
+        content, re.DOTALL,
+    )
+    assert match is not None, (
+        "Marcajele PREPARE_PAYLOAD_START/PREPARE_PAYLOAD_END lipsesc — "
+        "necesare pentru verificarea stricta ca conversation_id nu mai e null hardcodat."
+    )
+    return match.group(1)
+
+
+def test_prepare_payload_foloseste_current_conversation_id(workbench_content):
+    block = _extract_prepare_payload_block(workbench_content)
+    assert "currentConversationId" in block
+
+
+def test_prepare_payload_nu_mai_are_null_hardcodat(workbench_content):
+    """
+    Regresie fata de starea dinainte de Decizia 34: conversation_id NU
+    mai e literalul 'null' — trebuie sa fie variabila reala.
+    """
+    block = _extract_prepare_payload_block(workbench_content)
+    assert "conversation_id: null" not in block
+    assert "conversation_id: currentConversationId" in block
 
 
 # ----------------------------------------------------------------------
