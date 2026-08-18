@@ -88,7 +88,14 @@ class PrepareResponseOptionsResult:
 | Erori | `ValueError` — categorie invalidă, ridicată de `create_objection` **înainte** de orice INSERT (zero rânduri scrise dacă eșuează); `psycopg.errors.ForeignKeyViolation` — `owner_id`/`conversation_id` invalid, propagă neprinsă (consecvent cu `20-2A`) |
 | De ce `get_variants` DUPĂ `create_objection`, nu înainte | Ordinea contează pentru `objection_id`: obiecția trebuie să existe în DB înainte ca liderul să poată alege o variantă și apoi confirma (`confirm_response` are nevoie de `objection_id` real). `ALL_CATEGORIES == _LIBRARY.keys()` (verificat, secțiunea 0) garantează că `get_variants` nu eșuează separat pentru o categorie deja acceptată de `create_objection`. |
 
-### 3.3 `confirm_response(objection_id, owner_id, objection_category, objection_text, response_text, response_variant_used) -> ConfirmResponseResult`
+### 3.3 `confirm_response(objection: Objection, response_text: str, response_variant_used: str) -> ConfirmResponseResult`
+
+**Semnătură revizuită față de varianta inițială (4 câmpuri separate)** — motiv: `ObjectionEngine`
+nu are nicio metodă de citire (`get_objection(id)`); `owner_id`/`objection_category`/
+`objection_text` nu pot veni decât din `Objection`-ul deja obținut la pasul `3.2`, nu din input
+nou al liderului. UI-ul transmite efectiv doar decizia liderului (`response_text`,
+`response_variant_used`) — `objection_id` e deja parte din `objection.id`, păstrat de apelant
+între cei doi pași (`prepare_response_options()` → `confirm_response()`), nu retrimis separat.
 
 ```python
 @dataclass(frozen=True)
@@ -101,9 +108,9 @@ class ConfirmResponseResult:
 | | |
 |---|---|
 | DB | **DA** — deleagă direct la `ObjectionEngine.submit_response()` |
-| `objection_category`/`objection_text` sursă | Din `Objection` întors de `prepare_response_options()` — **nu** re-introduse de lider, evită inconsecvență între ce s-a clasificat și ce se validează |
+| `objection_id`, `owner_id`, `objection_category`, `objection_text` sursă | Toate extrase din `objection` (parametrul), niciunul reintrodus de UI/lider |
 | `response_text`/`response_variant_used` sursă | Alese/editate de lider din `variants` (pasul 3.2) — `response_variant_used` e cheia ALEASĂ INIȚIAL, neschimbată dacă liderul editează `response_text` (regulă Decizia 3, `21`, secțiunea 4) |
-| Erori | `ObjectionNotFoundError` — `objection_id` nu există sau nu aparține `owner_id`, trebuie prinsă explicit de apelantul HTTP/UI al `ConversationAgent`, nu lăsată necontrolată aici (contractul `ConversationAgent` doar o lasă să propage — nu o traduce) |
+| Erori | `ObjectionNotFoundError` — propagă neprinsă din `ObjectionEngine.submit_response()`; contractul `ConversationAgent` nu o traduce |
 | `validation_level`/`reason` | Extrase din `SubmitResponseResult.validation` (`ValidationResult.level`, `.reason`) — `ConversationAgent` nu reinterpretează nivelurile, doar le expune |
 
 ---
@@ -131,10 +138,7 @@ final_text = result2.variants[chosen_key]  # posibil editat de lider
 
 # 5.
 result3 = agent.confirm_response(
-    objection_id=result2.objection.id,
-    owner_id=result2.objection.owner_id,
-    objection_category=result2.objection.objection_category,
-    objection_text=result2.objection.objection_text,
+    objection=result2.objection,
     response_text=final_text,
     response_variant_used=chosen_key,
 )
