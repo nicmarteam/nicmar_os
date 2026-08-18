@@ -1,18 +1,44 @@
 """
-Router Contacts — API, sursă: 31-contact-create-contract.md.
+Router Contacts — API, sursă: 31-contact-create-contract.md,
+33-conversation-objection-linkage-contract.md.
 
 Router subțire — fără logică de business, fără SQL. owner_id vine
 exclusiv din JWT, status e hardcodat server-side în ContactEngine.
 """
 
+from typing import List
+
 from fastapi import APIRouter, Depends
 
-from src.api.dependencies import get_contact_engine
-from src.api.schemas import CreateContactRequest, ContactResponse
+from src.api.dependencies import get_contact_engine, get_contact_agent
+from src.api.schemas import CreateContactRequest, ContactResponse, ContactSummaryResponse
 from src.auth.dependencies import get_current_user, CurrentUser
 from src.engines.contact.contact_engine import ContactEngine
+from src.agents.contact.contact_agent import ContactAgent
 
 router = APIRouter(prefix="/api/v1/contacts", tags=["contacts"])
+
+
+@router.get("", response_model=List[ContactSummaryResponse])
+def list_contacts(
+    current_user: CurrentUser = Depends(get_current_user),
+    contact_agent: ContactAgent = Depends(get_contact_agent),
+):
+    """
+    Listă prioritizată de contacte ale liderului autentificat.
+
+    READ-ONLY — deleagă integral la ContactAgent (Decizia 33), deja
+    implementat și testat, doar neconectat la HTTP până acum.
+    """
+    summaries = contact_agent.list_prioritized_contacts(current_user.id)
+    return [
+        ContactSummaryResponse(
+            contact_id=s.contact_id, full_name=s.full_name, status=s.status,
+            last_followup_at=s.last_followup_at, last_followup_status=s.last_followup_status,
+            converted_to=s.converted_to, pdi=s.pdi, pip=s.pip, reason=s.reason,
+        )
+        for s in summaries
+    ]
 
 
 @router.post("", response_model=ContactResponse, status_code=201)
