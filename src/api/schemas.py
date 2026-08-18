@@ -181,3 +181,19 @@ class ContactResponse(BaseModel):
     status: str
     source: Optional[str]
     metadata: dict
+
+
+# ------------------------------------------------------------------
+# Partners (create) — sursă: 32-partner-create-contract.md
+# ------------------------------------------------------------------
+
+class CreatePartnerRequest(BaseModel):
+    contact_id: UUID
+
+
+class PartnerResponse(BaseModel):
+    id: UUID
+    owner_id: UUID
+    contact_id: UUID
+    status: str
+    partner_level: str
