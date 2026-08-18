@@ -437,3 +437,76 @@ def test_list_categories_nu_atinge_db(engine):
 def test_list_categories_returneaza_lista_nu_frozenset(engine):
     categories = engine.list_categories()
     assert isinstance(categories, list)
+
+
+# ----------------------------------------------------------------------
+# get_objection - Decizia 8A, 25-get-objection-contract.md
+# ----------------------------------------------------------------------
+
+
+def test_get_objection_returneaza_objection_complet(engine):
+    owner_id = uuid4()
+    conversation_id = uuid4()
+    objection_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([
+            (objection_id, owner_id, conversation_id, "PRET", "e scump", "OPEN"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        objection = engine.get_objection(objection_id=objection_id, owner_id=owner_id)
+
+        assert objection == Objection(
+            id=objection_id, owner_id=owner_id, conversation_id=conversation_id,
+            objection_category="PRET", objection_text="e scump", resolution_status="OPEN",
+        )
+
+        executed_sql = mock_cur.execute.call_args[0][0]
+        executed_params = mock_cur.execute.call_args[0][1]
+        assert "SELECT" in executed_sql
+        assert "FROM objections" in executed_sql
+        assert "owner_id" in executed_sql
+        assert objection_id in executed_params
+        assert owner_id in executed_params
+
+
+def test_get_objection_filtreaza_owner_id_in_where(engine):
+    """owner_id trebuie sa fie in WHERE, nu doar id — existenta id-ului singura nu acorda acces."""
+    owner_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([
+            (uuid4(), owner_id, None, "TIMP", "nu am timp", "OPEN"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.get_objection(objection_id=uuid4(), owner_id=owner_id)
+
+        executed_sql = mock_cur.execute.call_args[0][0]
+        assert "WHERE" in executed_sql
+        assert "owner_id" in executed_sql
+
+
+def test_get_objection_inexistent_ridica_eroare(engine):
+    """Rand inexistent -> ObjectionNotFoundError (reuseste exceptia, nu una noua)."""
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([None])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        with pytest.raises(ObjectionNotFoundError):
+            engine.get_objection(objection_id=uuid4(), owner_id=uuid4())
+
+
+def test_get_objection_owner_gresit_ridica_aceeasi_eroare(engine):
+    """
+    Owner gresit -> SELECT nu gaseste randul (filtrat de WHERE owner_id) ->
+    ObjectionNotFoundError — identic cu 'nu exista', fara sa dezvaluie ca
+    id-ul e valid pentru alt owner (previne enumerare).
+    """
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([None])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        with pytest.raises(ObjectionNotFoundError):
+            engine.get_objection(objection_id=uuid4(), owner_id=uuid4())
