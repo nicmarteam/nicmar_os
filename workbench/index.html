@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NicMar OS — Objection Workbench</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --ink: #1f2420;
+    --ink-soft: #5b6660;
+    --line: #dcdad3;
+    --accent: #2f6f5e;
+    --accent-ink: #ffffff;
+    --warn-bg: #fdf3dd;
+    --warn-border: #d99a2b;
+    --warn-ink: #7a5410;
+    --good-bg: #e9f5ee;
+    --good-border: #2f6f5e;
+    --good-ink: #1c4a3c;
+    --info-bg: #eaf1fb;
+    --info-border: #3b6fb0;
+    --info-ink: #1f3f66;
+    --error-bg: #fbeaea;
+    --error-border: #b3403e;
+    --error-ink: #7a2321;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.45;
+  }
+  header {
+    padding: 20px 24px 8px;
+  }
+  header h1 {
+    font-size: 20px;
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+  }
+  header p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .panel h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel h2 .step-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .panel.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  input[type="email"], input[type="password"], textarea {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--ink);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .row > div { flex: 1; }
+  button {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    padding: 9px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled {
+    background: #b9c2bd;
+    cursor: not-allowed;
+  }
+  button.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .category-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .category-btn {
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .category-btn.selected {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+  .variant-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .variant-card:hover { border-color: var(--accent); }
+  .variant-card.selected {
+    border-color: var(--accent);
+    background: var(--good-bg);
+  }
+  .variant-card .label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .variant-card .text { font-size: 13px; color: var(--ink); }
+  .banner {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .banner.pass { background: var(--good-bg); border-color: var(--good-border); color: var(--good-ink); }
+  .banner.block { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-ink); }
+  .banner.info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-ink); }
+  .banner.error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-ink); }
+  .status-line {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+  .hidden { display: none !important; }
+  .session-badge {
+    font-size: 12px;
+    color: var(--good-ink);
+    background: var(--good-bg);
+    border: 1px solid var(--good-border);
+    padding: 4px 10px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Objection Workbench</h1>
+  <p>NicMar OS — instrument intern pentru gestionarea obiecțiilor prospectului</p>
+</header>
+
+<main>
+
+  <!-- ZONA TOKEN / LOGIN — sectiunea 2.1 -->
+  <section class="panel" id="panel-login">
+    <h2><span class="step-no">•</span> Autentificare</h2>
+
+    <div id="login-form">
+      <div class="row">
+        <div>
+          <label for="email-input">Email</label>
+          <input type="email" id="email-input" autocomplete="username">
+        </div>
+        <div>
+          <label for="password-input">Parolă</label>
+          <input type="password" id="password-input" autocomplete="current-password">
+        </div>
+      </div>
+      <button id="login-btn" onclick="login()">Intră</button>
+      <div class="status-line" id="login-status"></div>
+    </div>
+
+    <div id="login-success" class="hidden">
+      <span class="session-badge">✓ Autentificat — token păstrat doar în memoria acestei pagini</span>
+      <div class="status-line">Reîncarci pagina → trebuie să te autentifici din nou (comportament intenționat, tokenul nu e persistat).</div>
+    </div>
+  </section>
+
+  <!-- FAZA 1 — ANALIZĂ — sectiunea 2.2 -->
+  <section class="panel disabled" id="panel-analyze">
+    <h2><span class="step-no">1</span> Analizează obiecția</h2>
+    <label for="objection-text-input">Ce a spus prospectul?</label>
+    <textarea id="objection-text-input" placeholder="ex: Mi se pare prea scump."></textarea>
+    <div style="margin-top:10px;">
+      <button id="analyze-btn" onclick="analyzeObjection()">Analizează</button>
+    </div>
+    <div id="analyze-result" class="hidden" style="margin-top:14px;">
+      <div id="detected-category-box" class="hidden">
+        <p>Categorie detectată: <strong id="detected-category-label"></strong></p>
+        <button onclick="confirmDetectedCategory()">Continuă cu această categorie</button>
+      </div>
+      <div id="manual-category-box" class="hidden">
+        <p>Nu am putut detecta automat categoria. Alege una dintre cele 13:</p>
+        <div class="category-list" id="category-list"></div>
+      </div>
+    </div>
+    <div class="status-line" id="analyze-status"></div>
+  </section>
+
+  <!-- FAZA 2 — PREGATIRE — sectiunea 2.3 -->
+  <section class="panel disabled" id="panel-prepare">
+    <h2><span class="step-no">2</span> Alege și editează răspunsul</h2>
+    <div id="variants-container"></div>
+    <label for="response-text-input" style="margin-top:10px;">Text final (editabil)</label>
+    <textarea id="response-text-input" placeholder="Selectează mai întâi o variantă mai sus"></textarea>
+    <div class="status-line" id="prepare-status"></div>
+  </section>
+
+  <!-- FAZA 3 — CONFIRMARE — sectiunea 2.4 -->
+  <section class="panel disabled" id="panel-confirm">
+    <h2><span class="step-no">3</span> Confirmă și trimite</h2>
+    <button id="confirm-btn" onclick="confirmResponse()" disabled>Confirmă și trimite</button>
+    <div id="confirm-result"></div>
+  </section>
+
+</main>
+
+<script>
+  // ------------------------------------------------------------------
+  // Stare runtime — NICIODATA persistata in browser (fara storage de niciun fel, fara cookie)
+  // ------------------------------------------------------------------
+  let authToken = null;
+  let currentObjectionText = "";
+  let currentCategory = null;
+  let currentObjectionId = null;
+  let currentVariants = {};
+  let chosenVariantKey = null;
+
+  const API_BASE = "/api/v1"; // documentativ — fiecare endpoint e scris ca string literal complet mai jos
+
+  // ------------------------------------------------------------------
+  // Helper HTTP — adauga mereu Authorization: Bearer <token>. Primeste
+  // url-ul COMPLET (nu concatenat), pentru ca fiecare endpoint sa fie
+  // vizibil ca string literal la locul apelului.
+  // ------------------------------------------------------------------
+  async function apiFetch(url, options = {}) {
+    const headers = Object.assign(
+      { "Content-Type": "application/json" },
+      options.headers || {},
+    );
+    if (authToken) {
+      headers["Authorization"] = "Bearer " + authToken;
+    }
+    const response = await fetch(url, Object.assign({}, options, { headers }));
+
+    if (response.status === 401) {
+      authToken = null;
+      document.getElementById("login-form").classList.remove("hidden");
+      document.getElementById("login-success").classList.add("hidden");
+      setPanelEnabled("panel-analyze", false);
+      setPanelEnabled("panel-prepare", false);
+      setPanelEnabled("panel-confirm", false);
+      throw new Error("Sesiunea a expirat sau tokenul e invalid — autentifică-te din nou.");
+    }
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const message = body.message || `Eroare (${response.status}).`;
+      const err = new Error(message);
+      err.status = response.status;
+      err.errorCode = body.error_code;
+      throw err;
+    }
+
+    return body;
+  }
+
+  function setPanelEnabled(panelId, enabled) {
+    const el = document.getElementById(panelId);
+    if (enabled) el.classList.remove("disabled");
+    else el.classList.add("disabled");
+  }
+
+  // ------------------------------------------------------------------
+  // LOGIN — POST /api/v1/auth/login. Parola citita direct din input,
+  // folosita o singura data pentru request, apoi campul e golit.
+  // Parola NU e stocata in nicio variabila JS.
+  // ------------------------------------------------------------------
+  async function login() {
+    const emailInput = document.getElementById("email-input");
+    const passwordInput = document.getElementById("password-input");
+    const statusEl = document.getElementById("login-status");
+
+    const email = emailInput.value;
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      statusEl.textContent = "Completează email și parolă.";
+      return;
+    }
+
+    statusEl.textContent = "Se autentifică...";
+
+    try {
+      const result = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, password: password }),
+      });
+      const data = await result.json();
+
+      // Parola dispare din camp si nu mai e referita nicaieri dupa acest punct.
+      passwordInput.value = "";
+
+      if (!result.ok) {
+        statusEl.textContent = data.message || "Autentificare eșuată.";
+        return;
+      }
+
+      authToken = data.access_token;
+
+      document.getElementById("login-form").classList.add("hidden");
+      document.getElementById("login-success").classList.remove("hidden");
+      statusEl.textContent = "";
+      setPanelEnabled("panel-analyze", true);
+    } catch (e) {
+      passwordInput.value = "";
+      statusEl.textContent = "Eroare de rețea la autentificare.";
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // FAZA 1 — analyze_objection()
+  // ------------------------------------------------------------------
+  async function analyzeObjection() {
+    const textInput = document.getElementById("objection-text-input");
+    const statusEl = document.getElementById("analyze-status");
+    const objectionText = textInput.value.trim();
+
+    if (!objectionText) {
+      statusEl.textContent = "Introdu textul obiecției.";
+      return;
+    }
+
+    currentObjectionText = objectionText;
+    statusEl.textContent = "Se analizează...";
+
+    try {
+      const result = await apiFetch("/api/v1/objections/analyze", {
+        method: "POST",
+        body: JSON.stringify({ objection_text: objectionText }),
+      });
+
+      statusEl.textContent = "";
+      document.getElementById("analyze-result").classList.remove("hidden");
+
+      if (result.needs_manual_selection) {
+        document.getElementById("detected-category-box").classList.add("hidden");
+        document.getElementById("manual-category-box").classList.remove("hidden");
+        await loadCategories();
+      } else {
+        document.getElementById("manual-category-box").classList.add("hidden");
+        document.getElementById("detected-category-box").classList.remove("hidden");
+        document.getElementById("detected-category-label").textContent = result.detected_category;
+        currentCategory = result.detected_category;
+      }
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  function confirmDetectedCategory() {
+    prepareOptions();
+  }
+
+  // ------------------------------------------------------------------
+  // GET /api/v1/objections/categories — cele 13, pentru selectie manuala
+  // ------------------------------------------------------------------
+  async function loadCategories() {
+    const statusEl = document.getElementById("analyze-status");
+    try {
+      const result = await apiFetch("/api/v1/objections/categories", { method: "GET" });
+      const listEl = document.getElementById("category-list");
+      listEl.innerHTML = "";
+      result.categories.forEach(function (category) {
+        const btn = document.createElement("button");
+        btn.className = "category-btn";
+        btn.type = "button";
+        btn.textContent = category;
+        btn.onclick = function () { selectCategory(category, btn); };
+        listEl.appendChild(btn);
+      });
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  function selectCategory(category, btnEl) {
+    currentCategory = category;
+    document.querySelectorAll(".category-btn").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+    btnEl.classList.add("selected");
+    prepareOptions();
+  }
+
+  // ------------------------------------------------------------------
+  // FAZA 2 — prepare_response_options()
+  // ------------------------------------------------------------------
+  async function prepareOptions() {
+    const statusEl = document.getElementById("prepare-status");
+    statusEl.textContent = "Se pregătesc variantele...";
+
+    try {
+      const result = await apiFetch("/api/v1/objections/prepare", {
+        method: "POST",
+        body: JSON.stringify({
+          objection_text: currentObjectionText,
+          objection_category: currentCategory,
+          conversation_id: null,
+        }),
+      });
+
+      currentObjectionId = result.objection_id;
+      currentVariants = result.variants;
+      chosenVariantKey = null;
+
+      renderVariants();
+      setPanelEnabled("panel-prepare", true);
+      statusEl.textContent = "";
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  function renderVariants() {
+    const container = document.getElementById("variants-container");
+    container.innerHTML = "";
+    ["CALDA", "DIRECTA", "INTREBARE"].forEach(function (key) {
+      const text = currentVariants[key];
+      if (text === undefined) return;
+      const card = document.createElement("div");
+      card.className = "variant-card";
+      card.onclick = function () { selectVariant(key, card); };
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = key;
+      const body = document.createElement("div");
+      body.className = "text";
+      body.textContent = text;
+      card.appendChild(label);
+      card.appendChild(body);
+      container.appendChild(card);
+    });
+  }
+
+  function selectVariant(key, cardEl) {
+    chosenVariantKey = key;
+    document.querySelectorAll(".variant-card").forEach(function (c) {
+      c.classList.remove("selected");
+    });
+    cardEl.classList.add("selected");
+
+    const responseTextInput = document.getElementById("response-text-input");
+    responseTextInput.value = currentVariants[key];
+
+    setPanelEnabled("panel-confirm", true);
+    document.getElementById("confirm-btn").disabled = false;
+  }
+
+  // ------------------------------------------------------------------
+  // FAZA 3 — confirm_response()
+  //
+  // Payload-ul trimis catre /confirm este STRICT limitat — vezi
+  // marcajele CONFIRM_PAYLOAD_START/END. Nu contine niciodata identitatea
+  // liderului sau continutul original al obiectiei (acelea vin din DB,
+  // server-side, prin get_objection()).
+  // ------------------------------------------------------------------
+  async function confirmResponse() {
+    const resultEl = document.getElementById("confirm-result");
+    const confirmBtn = document.getElementById("confirm-btn");
+    const responseTextInput = document.getElementById("response-text-input");
+
+    if (!currentObjectionId || !chosenVariantKey) {
+      resultEl.innerHTML = '<div class="banner error">Selectează mai întâi o variantă.</div>';
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    resultEl.innerHTML = "";
+
+    // CONFIRM_PAYLOAD_START
+    const confirmPayload = {
+      objection_id: currentObjectionId,
+      response_text: responseTextInput.value,
+      response_variant_used: chosenVariantKey,
+    };
+    // CONFIRM_PAYLOAD_END
+
+    try {
+      const result = await apiFetch("/api/v1/objections/confirm", {
+        method: "POST",
+        body: JSON.stringify(confirmPayload),
+      });
+
+      renderConfirmResult(result);
+    } catch (e) {
+      resultEl.innerHTML =
+        '<div class="banner error">Eroare: ' + escapeHtml(e.message) + "</div>";
+      confirmBtn.disabled = false;
+    }
+  }
+
+  function renderConfirmResult(result) {
+    const resultEl = document.getElementById("confirm-result");
+    const confirmBtn = document.getElementById("confirm-btn");
+    const level = result.validation_level;
+
+    if (level === "PASS") {
+      resultEl.innerHTML =
+        '<div class="banner pass">✅ Răspuns trimis cu succes.</div>';
+      confirmBtn.disabled = true;
+    } else if (level === "BLOCK") {
+      resultEl.innerHTML =
+        '<div class="banner block">⚠️ Răspuns blocat de validarea de siguranță.<br>Motiv: ' +
+        escapeHtml(result.reason || "nespecificat") +
+        "<br><br>Poți edita textul mai sus și încerca din nou.</div>";
+      // BLOCK nu e eroare tehnica — liderul poate reincerca imediat
+      confirmBtn.disabled = false;
+    } else if (level === "PARTIAL_VALIDATION") {
+      resultEl.innerHTML =
+        '<div class="banner info">ℹ️ Trimis, dar semnalat: ' +
+        escapeHtml(result.reason || "") + "</div>";
+      confirmBtn.disabled = true;
+    } else if (level === "HUMAN_REVIEW") {
+      resultEl.innerHTML =
+        '<div class="banner info">ℹ️ Trimis — recomandăm verificare suplimentară: ' +
+        escapeHtml(result.reason || "") + "</div>";
+      confirmBtn.disabled = true;
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+</script>
+
+</body>
+</html>
