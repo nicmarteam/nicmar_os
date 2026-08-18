@@ -17,7 +17,7 @@ Nu implementat (out of scope v1, contract secțiunea 6 și 8):
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from src.data.db import get_connection
@@ -81,6 +81,19 @@ class ObjectionEngine:
     răspuns`, fără `RelationshipEngine`/`Motorul Identității`/
     `CustomerRelationshipEngine`/`PartnerRelationshipEngine`.
     """
+
+    def list_categories(self) -> List[str]:
+        """Listează toate cele 13 categorii oficiale (Decizia 6, `23-list-categories-contract.md`).
+
+        Pentru selecția manuală a liderului, când `classify()` returnează
+        `None` (fără potrivire deterministă). Pur — nu atinge DB.
+
+        Returns:
+            Listă cu cele 13 categorii din `ALL_CATEGORIES`, sortate
+            alfabetic (decizie explicită pentru afișare deterministă —
+            `frozenset`-ul sursă nu garantează ordine).
+        """
+        return sorted(ALL_CATEGORIES)
 
     def classify(self, objection_text: str) -> Optional[str]:
         """Clasifică determinist o obiecție (Decizia 2).
