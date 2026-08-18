@@ -816,7 +816,7 @@ class TestConversationAgentOnRealPostgres:
         cu PASS, verificat direct din tabela objections dupa fiecare pas.
         """
         owner_id = _create_user("conv-agent-flow")
-        agent = ConversationAgent(objection_engine=ObjectionEngine())
+        agent = ConversationAgent(objection_engine=ObjectionEngine(), conversation_engine=ConversationEngine())
 
         # Pasul 1 — analiza, fara nicio scriere
         analysis = agent.analyze_objection("Nu am timp.")
@@ -870,7 +870,7 @@ class TestConversationAgentOnRealPostgres:
     def test_confirm_response_block_nu_scrie_nimic_prin_agent(self):
         """BLOCK, prin orchestrarea agentului -> nimic persistat, la fel ca ObjectionEngine direct."""
         owner_id = _create_user("conv-agent-block")
-        agent = ConversationAgent(objection_engine=ObjectionEngine())
+        agent = ConversationAgent(objection_engine=ObjectionEngine(), conversation_engine=ConversationEngine())
 
         prep = agent.prepare_response_options(
             owner_id=owner_id, objection_text="e scump", objection_category="PRET",
@@ -900,7 +900,7 @@ class TestConversationAgentOnRealPostgres:
         """
         owner_a = _create_user("conv-agent-owner-a")
         owner_b = _create_user("conv-agent-owner-b")
-        agent = ConversationAgent(objection_engine=ObjectionEngine())
+        agent = ConversationAgent(objection_engine=ObjectionEngine(), conversation_engine=ConversationEngine())
 
         prep = agent.prepare_response_options(
             owner_id=owner_a, objection_text="nu am timp", objection_category="TIMP",
