@@ -3,6 +3,8 @@ Dependency injection pentru API — construiește Engine/Agent la fiecare
 request, exact ca în teste, nicio logică nouă adăugată aici.
 """
 
+from fastapi import Depends
+
 from src.engines.rule.rule_engine import RuleEngine
 from src.engines.mission.mission_engine import MissionEngine
 from src.agents.mission.mission_agent import MissionAgent
@@ -10,6 +12,8 @@ from src.engines.followup.followup_engine import FollowUpEngine
 from src.agents.followup.followup_agent import FollowUpAgent
 from src.engines.partner.partner_engine import PartnerEngine
 from src.agents.partner.partner_agent import PartnerAgent
+from src.engines.objection.objection_engine import ObjectionEngine
+from src.agents.conversation.conversation_agent import ConversationAgent
 
 
 def get_mission_agent() -> MissionAgent:
@@ -38,3 +42,20 @@ def get_partner_agent() -> PartnerAgent:
     rule_engine = RuleEngine()
     partner_engine = PartnerEngine(rule_engine=rule_engine)
     return PartnerAgent(partner_engine=partner_engine)
+
+
+def get_objection_engine() -> ObjectionEngine:
+    """Decizia 7, `24-dependency-wiring-contract.md` — fără dependințe proprii."""
+    return ObjectionEngine()
+
+
+def get_conversation_agent(
+    objection_engine: ObjectionEngine = Depends(get_objection_engine),
+) -> ConversationAgent:
+    """
+    Decizia 7 — chaining real, spre deosebire de wiring-ul independent de
+    mai sus (Mission/FollowUp/Partner). `Depends(get_objection_engine)`
+    garantează, în cadrul aceluiași request, aceeași instanță de
+    `ObjectionEngine` pentru orice alt endpoint care ar cere-o separat.
+    """
+    return ConversationAgent(objection_engine=objection_engine)
