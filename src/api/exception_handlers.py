@@ -8,7 +8,7 @@ Nicio excepție nouă inventată aici — doar mapate cele deja existente
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from psycopg.errors import ForeignKeyViolation
+from psycopg.errors import ForeignKeyViolation, UniqueViolation
 
 from src.engines.mission.mission_engine import (
     MissionNotReadyError, MissionAccessDeniedError,
@@ -36,6 +36,10 @@ def _error_response(status_code: int, error_code: str, message: str) -> JSONResp
 
 ALREADY_EXISTS_ERRORS = (
     MissionNotReadyError, FollowUpDuplicateError, PartnerDiagnosticAlreadyGeneratedError,
+    # UniqueViolation — Decizia 30 (Auth Registration v1): email duplicat la
+    # /register. Reutilizează categoria ALREADY_EXISTS existentă (409),
+    # nu introduce una nouă.
+    UniqueViolation,
 )
 ACCESS_DENIED_ERRORS = (
     MissionAccessDeniedError, FollowUpAccessDeniedError, PartnerAccessDeniedError,
