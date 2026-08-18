@@ -228,6 +228,32 @@
     </div>
   </section>
 
+  <!-- ZONA CONTACT & CONVERSATIE — Decizia 34, sectiunea 2.1 -->
+  <section class="panel disabled" id="panel-contact">
+    <h2><span class="step-no">•</span> Contact și conversație</h2>
+
+    <div id="contacts-list-box">
+      <p class="status-line">Alege un contact pentru a începe:</p>
+      <div class="category-list" id="contacts-list"></div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label for="new-contact-name-input">Sau adaugă un contact nou</label>
+      <div class="row">
+        <div>
+          <input type="text" id="new-contact-name-input" placeholder="Nume complet">
+        </div>
+      </div>
+      <button class="secondary" onclick="createNewContact()">Adaugă contact</button>
+    </div>
+
+    <div class="status-line" id="contact-status"></div>
+
+    <div id="conversation-status-box" class="hidden" style="margin-top:12px;">
+      <span class="session-badge">✓ Conversație activă — pregătit pentru obiecție</span>
+    </div>
+  </section>
+
   <!-- FAZA 1 — ANALIZĂ — sectiunea 2.2 -->
   <section class="panel disabled" id="panel-analyze">
     <h2><span class="step-no">1</span> Analizează obiecția</h2>
@@ -272,6 +298,8 @@
   // Stare runtime — NICIODATA persistata in browser (fara storage de niciun fel, fara cookie)
   // ------------------------------------------------------------------
   let authToken = null;
+  let currentContactId = null;
+  let currentConversationId = null;
   let currentObjectionText = "";
   let currentCategory = null;
   let currentObjectionId = null;
@@ -299,6 +327,7 @@
       authToken = null;
       document.getElementById("login-form").classList.remove("hidden");
       document.getElementById("login-success").classList.add("hidden");
+      setPanelEnabled("panel-contact", false);
       setPanelEnabled("panel-analyze", false);
       setPanelEnabled("panel-prepare", false);
       setPanelEnabled("panel-confirm", false);
@@ -365,10 +394,80 @@
       document.getElementById("login-form").classList.add("hidden");
       document.getElementById("login-success").classList.remove("hidden");
       statusEl.textContent = "";
-      setPanelEnabled("panel-analyze", true);
+      setPanelEnabled("panel-contact", true);
+      await loadContacts();
     } catch (e) {
       passwordInput.value = "";
       statusEl.textContent = "Eroare de rețea la autentificare.";
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // ZONA CONTACT & CONVERSATIE — Decizia 34
+  // ------------------------------------------------------------------
+  async function loadContacts() {
+    const statusEl = document.getElementById("contact-status");
+    try {
+      const contacts = await apiFetch("/api/v1/contacts", { method: "GET" });
+      const listEl = document.getElementById("contacts-list");
+      listEl.innerHTML = "";
+      contacts.forEach(function (contact) {
+        const btn = document.createElement("button");
+        btn.className = "category-btn";
+        btn.type = "button";
+        btn.textContent = contact.full_name + " (" + contact.status + ")";
+        btn.onclick = function () { selectContact(contact.contact_id, btn); };
+        listEl.appendChild(btn);
+      });
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function createNewContact() {
+    const nameInput = document.getElementById("new-contact-name-input");
+    const statusEl = document.getElementById("contact-status");
+    const fullName = nameInput.value.trim();
+
+    if (!fullName) {
+      statusEl.textContent = "Introdu numele contactului.";
+      return;
+    }
+
+    try {
+      await apiFetch("/api/v1/contacts", {
+        method: "POST",
+        body: JSON.stringify({ full_name: fullName }),
+      });
+      nameInput.value = "";
+      statusEl.textContent = "";
+      await loadContacts();
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function selectContact(contactId, btnEl) {
+    const statusEl = document.getElementById("contact-status");
+    currentContactId = contactId;
+    document.querySelectorAll("#contacts-list .category-btn").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+    btnEl.classList.add("selected");
+
+    statusEl.textContent = "Se pregătește conversația...";
+
+    try {
+      const conversation = await apiFetch("/api/v1/conversations", {
+        method: "POST",
+        body: JSON.stringify({ contact_id: contactId }),
+      });
+      currentConversationId = conversation.id;
+      statusEl.textContent = "";
+      document.getElementById("conversation-status-box").classList.remove("hidden");
+      setPanelEnabled("panel-analyze", true);
+    } catch (e) {
+      statusEl.textContent = e.message;
     }
   }
 
@@ -454,14 +553,18 @@
     const statusEl = document.getElementById("prepare-status");
     statusEl.textContent = "Se pregătesc variantele...";
 
+    // PREPARE_PAYLOAD_START
+    const preparePayload = {
+      objection_text: currentObjectionText,
+      objection_category: currentCategory,
+      conversation_id: currentConversationId,
+    };
+    // PREPARE_PAYLOAD_END
+
     try {
       const result = await apiFetch("/api/v1/objections/prepare", {
         method: "POST",
-        body: JSON.stringify({
-          objection_text: currentObjectionText,
-          objection_category: currentCategory,
-          conversation_id: null,
-        }),
+        body: JSON.stringify(preparePayload),
       });
 
       currentObjectionId = result.objection_id;
