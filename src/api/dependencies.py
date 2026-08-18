@@ -14,6 +14,7 @@ from src.engines.partner.partner_engine import PartnerEngine
 from src.agents.partner.partner_agent import PartnerAgent
 from src.engines.objection.objection_engine import ObjectionEngine
 from src.agents.conversation.conversation_agent import ConversationAgent
+from src.engines.contact.contact_engine import ContactEngine
 
 
 def get_mission_agent() -> MissionAgent:
@@ -59,3 +60,8 @@ def get_conversation_agent(
     `ObjectionEngine` pentru orice alt endpoint care ar cere-o separat.
     """
     return ConversationAgent(objection_engine=objection_engine)
+
+
+def get_contact_engine() -> ContactEngine:
+    """Decizia 31, `31-contact-create-contract.md` — fără dependințe proprii."""
+    return ContactEngine()
