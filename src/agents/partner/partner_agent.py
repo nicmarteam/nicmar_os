@@ -26,7 +26,7 @@ from typing import Optional
 from uuid import UUID
 
 from src.data.db import get_connection
-from src.engines.partner.partner_engine import PartnerDiagnostic, PartnerEngine
+from src.engines.partner.partner_engine import Partner, PartnerDiagnostic, PartnerEngine
 
 
 class PartnerAgent:
@@ -38,6 +38,14 @@ class PartnerAgent:
 
     def __init__(self, partner_engine: PartnerEngine):
         self.partner_engine = partner_engine
+
+    # ------------------------------------------------------------------
+    # Creare — Decizia 32, deleagă integral, fără logică proprie
+    # ------------------------------------------------------------------
+
+    def create_partner(self, owner_id: UUID, contact_id: UUID) -> Partner:
+        """Deleagă crearea către PartnerEngine — agentul nu decide nimic aici."""
+        return self.partner_engine.create_partner(owner_id, contact_id)
 
     # ------------------------------------------------------------------
     # Solicitare diagnostic — deleagă, nu generează singur
