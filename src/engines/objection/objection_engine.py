@@ -184,6 +184,53 @@ class ObjectionEngine:
             resolution_status=row[5],
         )
 
+    def get_objection(self, objection_id: UUID, owner_id: UUID) -> Objection:
+        """Citește o obiecție existentă (Decizia 8A, `25-get-objection-contract.md`).
+
+        Precondiție pentru API-ul HTTP: HTTP e stateless între `/prepare` și
+        `/confirm` — `ConversationAgent.confirm_response()` re-citește
+        `Objection` prin această metodă, folosind `owner_id` din JWT, NICIODATĂ
+        din client. Previne exact vulnerabilitatea identificată în audit: un
+        client ar putea trimite o `objection_category` falsă, ca să ocolească
+        o regulă mai strictă de Safety Validation.
+
+        Args:
+            objection_id: Identificatorul rândului `objections` de citit.
+            owner_id: Identificatorul liderului autentificat — filtrare
+                obligatorie în `WHERE`, la fel ca `submit_response`. Existența
+                `objection_id` singură NU acordă acces.
+
+        Returns:
+            `Objection` complet, construit din valorile citite.
+
+        Raises:
+            ObjectionNotFoundError: rândul nu există SAU aparține altui
+                `owner_id` — reutilizează excepția existentă (folosită și de
+                `submit_response`), nu introduce una nouă pentru același tip
+                de eșec. Mesaj identic pentru ambele cazuri — previne
+                enumerare de ID-uri.
+        """
+        query = """
+            SELECT id, owner_id, conversation_id, objection_category,
+                   objection_text, resolution_status
+            FROM objections
+            WHERE id = %s AND owner_id = %s
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (objection_id, owner_id))
+                row = cur.fetchone()
+
+        if row is None:
+            raise ObjectionNotFoundError(
+                f"Obiecția {objection_id} nu există sau nu aparține owner-ului {owner_id}."
+            )
+
+        return Objection(
+            id=row[0], owner_id=row[1], conversation_id=row[2],
+            objection_category=row[3], objection_text=row[4], resolution_status=row[5],
+        )
+
     def submit_response(
         self,
         objection_id: UUID,
