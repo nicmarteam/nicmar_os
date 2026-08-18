@@ -279,3 +279,30 @@ def test_confirm_response_propaga_objection_not_found_error(agent, fake_engine):
         agent.confirm_response(
             objection=objection, response_text="text", response_variant_used="CALDA",
         )
+
+
+# ----------------------------------------------------------------------
+# list_categories() - Decizia 6, 23-list-categories-contract.md
+# ----------------------------------------------------------------------
+
+
+def test_list_categories_deleaga_la_engine(agent, fake_engine):
+    """list_categories() nu reimplementeaza nimic — deleaga integral la ObjectionEngine."""
+    fake_engine.list_categories.return_value = ["AMANARE", "FAMILIE_SUPORT", "PRET"]
+
+    result = agent.list_categories()
+
+    fake_engine.list_categories.assert_called_once_with()
+    assert result == ["AMANARE", "FAMILIE_SUPORT", "PRET"]
+
+
+def test_list_categories_nu_atinge_alte_metode_ale_engine(agent, fake_engine):
+    """list_categories() nu apeleaza classify/create_objection/get_variants/submit_response."""
+    fake_engine.list_categories.return_value = []
+
+    agent.list_categories()
+
+    fake_engine.classify.assert_not_called()
+    fake_engine.create_objection.assert_not_called()
+    fake_engine.get_variants.assert_not_called()
+    fake_engine.submit_response.assert_not_called()
