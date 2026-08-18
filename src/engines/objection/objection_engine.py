@@ -22,7 +22,7 @@ from uuid import UUID
 
 from src.data.db import get_connection
 from src.engines.objection.classifier import classify_objection
-from src.engines.objection.library import get_variants as _get_variants
+from src.engines.objection.library import ALL_CATEGORIES, get_variants as _get_variants
 from src.engines.objection.safety_validation import ValidationResult, validate_response
 
 
@@ -32,6 +32,31 @@ class ObjectionNotFoundError(Exception):
     Eroare explicită (contract secțiunea 6) — niciodată eșec silențios
     când 0 rânduri sunt afectate de UPDATE.
     """
+
+
+@dataclass(frozen=True)
+class Objection:
+    """Reprezentarea unei obiecții, așa cum e citită din `objections`.
+
+    Sursă: `20-2A-create-objection-contract.md`, secțiunea 2. Toate
+    câmpurile provin direct din `RETURNING` la INSERT — nu sunt
+    presupuse local.
+
+    Attributes:
+        id: Identificatorul generat de PostgreSQL (`gen_random_uuid()`).
+        owner_id: Liderul care deține obiecția.
+        conversation_id: Conversația asociată, sau `None` (coloană nullable).
+        objection_category: Una din cele 13 categorii oficiale (`ALL_CATEGORIES`).
+        objection_text: Textul liber, neschimbat, al obiecției.
+        resolution_status: Starea obiecției — `'OPEN'` la creare (`DEFAULT` DB).
+    """
+
+    id: UUID
+    owner_id: UUID
+    conversation_id: Optional[UUID]
+    objection_category: str
+    objection_text: str
+    resolution_status: str
 
 
 @dataclass(frozen=True)
@@ -82,6 +107,69 @@ class ObjectionEngine:
             ValueError: categorie necunoscută (v. `library.get_variants`).
         """
         return _get_variants(category)
+
+    def create_objection(
+        self,
+        owner_id: UUID,
+        objection_text: str,
+        objection_category: str,
+        conversation_id: Optional[UUID] = None,
+    ) -> Objection:
+        """Creează o obiecție nouă (Decizia 2A, `20-2A-create-objection-contract.md`).
+
+        `ObjectionEngine` este proprietarul complet al ciclului de viață
+        `objections` — `ConversationAgent` nu scrie niciodată direct în
+        această schemă, doar orchestrează apelul acestei metode.
+
+        Nu verifică duplicate: aceeași obiecție (owner + categorie + text)
+        poate apărea de mai multe ori în aceeași conversație — sunt
+        evenimente reale distincte, nu duplicate artificiale (contract
+        secțiunea 5).
+
+        Args:
+            owner_id: Identificatorul liderului autentificat — din
+                `CurrentUser.id` (JWT), niciodată din input liber.
+            objection_text: Textul liber al obiecției, neschimbat.
+            objection_category: Categoria obiecției — una din cele 13
+                oficiale (`ALL_CATEGORIES`, `library.py`).
+            conversation_id: Conversația asociată, opțional — coloana
+                `objections.conversation_id` e nullable.
+
+        Returns:
+            `Objection` complet, construit exact din valorile `RETURNING`
+            ale INSERT-ului — inclusiv `id` generat de PostgreSQL și
+            `resolution_status` aplicat din `DEFAULT 'OPEN'` al coloanei.
+
+        Raises:
+            ValueError: `objection_category` nu e una din cele 13
+                oficiale — verificat ÎNAINTE de orice conexiune DB.
+            psycopg.errors.ForeignKeyViolation: `owner_id` sau
+                `conversation_id` nu există — propagă neprinsă,
+                consecvent cu restul engine-urilor din repo (niciunul
+                nu traduce FK violation într-o eroare de domeniu).
+        """
+        if objection_category not in ALL_CATEGORIES:
+            raise ValueError(f"Categorie necunoscută: {objection_category!r}")
+
+        query = """
+            INSERT INTO objections (owner_id, conversation_id, objection_category, objection_text)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, owner_id, conversation_id, objection_category,
+                      objection_text, resolution_status
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (owner_id, conversation_id, objection_category, objection_text))
+                row = cur.fetchone()
+
+        return Objection(
+            id=row[0],
+            owner_id=row[1],
+            conversation_id=row[2],
+            objection_category=row[3],
+            objection_text=row[4],
+            resolution_status=row[5],
+        )
 
     def submit_response(
         self,
