@@ -3,14 +3,16 @@ Teste RED pentru ObjectionEngine (clasa care leaga clasificare +
 biblioteca + safety validation + persistare).
 
 Sursa: 21-objection-engine-contract.md, sectiunile 1, 4, 5; criterii 7.3.
+Sursa create_objection(): 20-2A-create-objection-contract.md.
 """
 
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import psycopg.errors
 import pytest
 
-from src.engines.objection.objection_engine import ObjectionEngine, ObjectionNotFoundError
+from src.engines.objection.objection_engine import Objection, ObjectionEngine, ObjectionNotFoundError
 
 
 def _make_cursor(rowcount=1):
@@ -27,6 +29,24 @@ def _make_conn(mock_cur):
     mock_conn.__enter__.return_value = mock_conn
     mock_conn.__exit__.return_value = False
     return mock_conn
+
+
+def _make_cursor_fetchone(fetchone_results):
+    """Cursor mock pentru INSERT ... RETURNING (create_objection)."""
+    mock_cur = MagicMock()
+    mock_cur.fetchone.side_effect = fetchone_results
+    mock_cur.__enter__.return_value = mock_cur
+    mock_cur.__exit__.return_value = False
+    return mock_cur
+
+
+def _make_cursor_raises(exc):
+    """Cursor mock al carui execute() ridica exc — pentru FK violation."""
+    mock_cur = MagicMock()
+    mock_cur.execute.side_effect = exc
+    mock_cur.__enter__.return_value = mock_cur
+    mock_cur.__exit__.return_value = False
+    return mock_cur
 
 
 @pytest.fixture
@@ -206,3 +226,183 @@ def test_submit_response_pastreaza_exact_variant_used_trimis(engine):
 
         executed_params = mock_cur.execute.call_args[0][1]
         assert "CALDA" in executed_params
+
+
+# ----------------------------------------------------------------------
+# create_objection - categorie invalida -> ValueError, ZERO apel DB
+# (Decizia 2A, 20-2A-create-objection-contract.md, sectiunea 5)
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_categorie_invalida_ridica_value_error(engine):
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        with pytest.raises(ValueError):
+            engine.create_objection(
+                owner_id=uuid4(),
+                objection_text="nu am incredere",
+                objection_category="CATEGORIE_INEXISTENTA",
+            )
+        mock_get_conn.assert_not_called()
+
+
+# ----------------------------------------------------------------------
+# create_objection - conversation_id=None permis, INSERT reuseste
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_fara_conversation_id(engine):
+    owner_id = uuid4()
+    objection_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([
+            (objection_id, owner_id, None, "PRET", "e scump", "OPEN"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        objection = engine.create_objection(
+            owner_id=owner_id,
+            objection_text="e scump",
+            objection_category="PRET",
+        )
+
+        assert objection == Objection(
+            id=objection_id,
+            owner_id=owner_id,
+            conversation_id=None,
+            objection_category="PRET",
+            objection_text="e scump",
+            resolution_status="OPEN",
+        )
+
+        executed_sql = mock_cur.execute.call_args[0][0]
+        assert "INSERT INTO objections" in executed_sql
+        assert "RETURNING" in executed_sql
+
+
+# ----------------------------------------------------------------------
+# create_objection - cu conversation_id valid
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_cu_conversation_id(engine):
+    owner_id = uuid4()
+    conversation_id = uuid4()
+    objection_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([
+            (objection_id, owner_id, conversation_id, "TIMP", "nu am timp", "OPEN"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        objection = engine.create_objection(
+            owner_id=owner_id,
+            objection_text="nu am timp",
+            objection_category="TIMP",
+            conversation_id=conversation_id,
+        )
+
+        assert objection.conversation_id == conversation_id
+
+        executed_params = mock_cur.execute.call_args[0][1]
+        assert conversation_id in executed_params
+
+
+# ----------------------------------------------------------------------
+# create_objection - toate campurile din Objection provin din RETURNING,
+# nu din presupuneri locale (verifica fiecare camp explicit)
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_toate_campurile_din_returning(engine):
+    owner_id = uuid4()
+    conversation_id = uuid4()
+    objection_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([
+            (objection_id, owner_id, conversation_id, "AMANARE", "ma mai gandesc", "OPEN"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        objection = engine.create_objection(
+            owner_id=owner_id,
+            objection_text="ma mai gandesc",
+            objection_category="AMANARE",
+            conversation_id=conversation_id,
+        )
+
+        assert objection.id == objection_id
+        assert objection.owner_id == owner_id
+        assert objection.conversation_id == conversation_id
+        assert objection.objection_category == "AMANARE"
+        assert objection.objection_text == "ma mai gandesc"
+        assert objection.resolution_status == "OPEN"
+
+
+# ----------------------------------------------------------------------
+# create_objection - owner_id invalid -> FK violation propaga neprinsa
+# (Decizia 2A: nu se prinde separat, consecvent cu restul repo-ului)
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_owner_invalid_propaga_fk_violation(engine):
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_raises(psycopg.errors.ForeignKeyViolation("owner_id inexistent"))
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            engine.create_objection(
+                owner_id=uuid4(),
+                objection_text="e scump",
+                objection_category="PRET",
+            )
+
+
+# ----------------------------------------------------------------------
+# create_objection - conversation_id invalid -> FK violation propaga neprinsa
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_conversation_invalid_propaga_fk_violation(engine):
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_raises(psycopg.errors.ForeignKeyViolation("conversation_id inexistent"))
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            engine.create_objection(
+                owner_id=uuid4(),
+                objection_text="e scump",
+                objection_category="PRET",
+                conversation_id=uuid4(),
+            )
+
+
+# ----------------------------------------------------------------------
+# create_objection - doua obiectii identice -> doua randuri distincte,
+# fara verificare de duplicat (Decizia 2A, sectiunea 5)
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_apeluri_identice_creeaza_doua_randuri(engine):
+    owner_id = uuid4()
+    first_id = uuid4()
+    second_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor_fetchone([
+            (first_id, owner_id, None, "PRET", "e scump", "OPEN"),
+            (second_id, owner_id, None, "PRET", "e scump", "OPEN"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        first = engine.create_objection(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+        second = engine.create_objection(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+
+        assert first.id != second.id
+        assert mock_cur.execute.call_count == 2
