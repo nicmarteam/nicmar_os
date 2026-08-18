@@ -88,14 +88,18 @@ class PrepareResponseOptionsResult:
 | Erori | `ValueError` — categorie invalidă, ridicată de `create_objection` **înainte** de orice INSERT (zero rânduri scrise dacă eșuează); `psycopg.errors.ForeignKeyViolation` — `owner_id`/`conversation_id` invalid, propagă neprinsă (consecvent cu `20-2A`) |
 | De ce `get_variants` DUPĂ `create_objection`, nu înainte | Ordinea contează pentru `objection_id`: obiecția trebuie să existe în DB înainte ca liderul să poată alege o variantă și apoi confirma (`confirm_response` are nevoie de `objection_id` real). `ALL_CATEGORIES == _LIBRARY.keys()` (verificat, secțiunea 0) garantează că `get_variants` nu eșuează separat pentru o categorie deja acceptată de `create_objection`. |
 
-### 3.3 `confirm_response(objection: Objection, response_text: str, response_variant_used: str) -> ConfirmResponseResult`
+### 3.3 `confirm_response(objection_id: UUID, owner_id: UUID, response_text: str, response_variant_used: str) -> ConfirmResponseResult`
 
-**Semnătură revizuită față de varianta inițială (4 câmpuri separate)** — motiv: `ObjectionEngine`
-nu are nicio metodă de citire (`get_objection(id)`); `owner_id`/`objection_category`/
-`objection_text` nu pot veni decât din `Objection`-ul deja obținut la pasul `3.2`, nu din input
-nou al liderului. UI-ul transmite efectiv doar decizia liderului (`response_text`,
-`response_variant_used`) — `objection_id` e deja parte din `objection.id`, păstrat de apelant
-între cei doi pași (`prepare_response_options()` → `confirm_response()`), nu retrimis separat.
+**Semnătură revizuită A DOUA OARĂ — Decizia 8A, `25-get-objection-contract.md`.** Varianta
+anterioară (`confirm_response(objection: Objection, ...)`) era corectă doar atât timp cât
+apelantul era cod Python fără graniță HTTP între `prepare_response_options()` și
+`confirm_response()`. Odată introdus routerul HTTP, apelantul devine un client nesigur —
+transportarea `Objection` prin el ar însemna să acceptăm `owner_id`/`objection_category`/
+`objection_text` din request, exact riscul identificat în audit (un client ar putea trimite o
+`objection_category` falsă, ca să ocolească o regulă mai strictă de Safety Validation).
+
+Acum `confirm_response()` re-citește `Objection` din DB, prin `ObjectionEngine.get_objection()`
+(nou), folosind `owner_id` din JWT — niciodată din client.
 
 ```python
 @dataclass(frozen=True)
@@ -107,10 +111,10 @@ class ConfirmResponseResult:
 
 | | |
 |---|---|
-| DB | **DA** — deleagă direct la `ObjectionEngine.submit_response()` |
-| `objection_id`, `owner_id`, `objection_category`, `objection_text` sursă | Toate extrase din `objection` (parametrul), niciunul reintrodus de UI/lider |
-| `response_text`/`response_variant_used` sursă | Alese/editate de lider din `variants` (pasul 3.2) — `response_variant_used` e cheia ALEASĂ INIȚIAL, neschimbată dacă liderul editează `response_text` (regulă Decizia 3, `21`, secțiunea 4) |
-| Erori | `ObjectionNotFoundError` — propagă neprinsă din `ObjectionEngine.submit_response()`; contractul `ConversationAgent` nu o traduce |
+| DB | **DA** — `ObjectionEngine.get_objection()` (SELECT) apoi `ObjectionEngine.submit_response()` (UPDATE) |
+| Ordine internă | `objection = get_objection(objection_id, owner_id)` → `submit_response(objection_id=objection.id, owner_id=objection.owner_id, objection_category=objection.objection_category, objection_text=objection.objection_text, response_text=..., response_variant_used=...)` |
+| Sursa fiecărui câmp | `objection_id` — client (path/body); `owner_id` — JWT/`CurrentUser.id`, NICIODATĂ din client; `objection_category`/`objection_text` — PostgreSQL, citite fresh, NICIODATĂ din client; `response_text`/`response_variant_used` — lider |
+| Erori | `ObjectionNotFoundError` — propagă neprinsă din `get_objection()` (rând inexistent sau owner greșit) SAU din `submit_response()` (aceeași excepție, refolosită); contractul `ConversationAgent` nu o traduce |
 | `validation_level`/`reason` | Extrase din `SubmitResponseResult.validation` (`ValidationResult.level`, `.reason`) — `ConversationAgent` nu reinterpretează nivelurile, doar le expune |
 
 ---
@@ -138,7 +142,8 @@ final_text = result2.variants[chosen_key]  # posibil editat de lider
 
 # 5.
 result3 = agent.confirm_response(
-    objection=result2.objection,
+    objection_id=result2.objection.id,
+    owner_id=current_user.id,
     response_text=final_text,
     response_variant_used=chosen_key,
 )
