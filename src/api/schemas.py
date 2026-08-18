@@ -1,8 +1,8 @@
 """
-Schema Pydantic pentru API — Mission, FollowUp, Partner și Auth.
+Schema Pydantic pentru API — Mission, FollowUp, Partner, Objections și Auth.
 """
 
-from typing import Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -93,3 +93,43 @@ class SendRequest(BaseModel):
 class PartnerScoresResponse(BaseModel):
     pdi: Optional[float] = None
     pip: Optional[float] = None
+
+
+# ------------------------------------------------------------------
+# Objections — sursă: 26-objections-router-contract.md
+# ------------------------------------------------------------------
+
+class AnalyzeObjectionRequest(BaseModel):
+    objection_text: str
+
+
+class AnalyzeObjectionResponse(BaseModel):
+    detected_category: Optional[str]
+    needs_manual_selection: bool
+
+
+class CategoriesResponse(BaseModel):
+    categories: List[str]
+
+
+class PrepareResponseOptionsRequest(BaseModel):
+    objection_text: str
+    objection_category: str
+    conversation_id: Optional[UUID] = None
+
+
+class PrepareResponseOptionsResponse(BaseModel):
+    objection_id: UUID
+    variants: Dict[str, str]
+
+
+class ConfirmResponseRequest(BaseModel):
+    objection_id: UUID
+    response_text: str
+    response_variant_used: str
+
+
+class ConfirmResponseResponseSchema(BaseModel):
+    persisted: bool
+    validation_level: str
+    reason: Optional[str]
