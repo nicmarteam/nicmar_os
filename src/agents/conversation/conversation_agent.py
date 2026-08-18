@@ -27,7 +27,7 @@ Nu implementate (out of scope v1, contract secțiunea 5):
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from src.engines.objection.objection_engine import Objection, ObjectionEngine
@@ -92,6 +92,23 @@ class ConversationAgent:
 
     def __init__(self, objection_engine: ObjectionEngine):
         self.objection_engine = objection_engine
+
+    # ------------------------------------------------------------------
+    # Pasul 0 — Selecție manuală, fără DB (Decizia 6)
+    # ------------------------------------------------------------------
+
+    def list_categories(self) -> List[str]:
+        """Listează cele 13 categorii oficiale, pentru selecția manuală a liderului.
+
+        Folosit când `analyze_objection()` returnează `needs_manual_selection=True`.
+        Deleagă integral la `ObjectionEngine.list_categories()` — nu importă
+        `ALL_CATEGORIES` direct din `library.py` (contract `23`, secțiunea 0:
+        `API → Agent → Engine → Library`, niciodată `API → Library`).
+
+        Returns:
+            Listă cu cele 13 categorii, sortate alfabetic.
+        """
+        return self.objection_engine.list_categories()
 
     # ------------------------------------------------------------------
     # Pasul 1 — Analiză, fără DB
