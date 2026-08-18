@@ -184,30 +184,60 @@ def test_prepare_response_options_propaga_fk_violation(agent, fake_engine):
 
 
 # ----------------------------------------------------------------------
-# confirm_response() — primeste Objection persistent, nu campuri separate
+# confirm_response() — Decizia 8A: scalari (objection_id, owner_id), NU
+# Objection complet — re-citeste din DB via get_objection(), pentru ca
+# HTTP e stateless intre /prepare si /confirm (25-get-objection-contract.md)
 # ----------------------------------------------------------------------
 
 
-def _make_objection():
+def _make_objection(objection_id=None, owner_id=None):
     return Objection(
-        id=uuid4(), owner_id=uuid4(), conversation_id=None,
+        id=objection_id or uuid4(), owner_id=owner_id or uuid4(), conversation_id=None,
         objection_category="PRET", objection_text="e scump", resolution_status="OPEN",
     )
 
 
-def test_confirm_response_apeleaza_submit_response_cu_datele_din_objection_persistent(agent, fake_engine):
+def test_confirm_response_apeleaza_get_objection_cu_id_si_owner_id(agent, fake_engine):
     """
-    submit_response() primeste objection_id/owner_id/objection_category/objection_text
-    EXCLUSIV din obiectul Objection transmis — niciodata reintroduse separat de UI.
+    confirm_response() apeleaza intai get_objection(objection_id, owner_id) —
+    NICIODATA nu primeste/foloseste objection_category/objection_text direct
+    din parametrii proprii, pentru ca acestia nu mai exista ca parametri.
     """
-    objection = _make_objection()
+    objection_id = uuid4()
+    owner_id = uuid4()
+    objection = _make_objection(objection_id=objection_id, owner_id=owner_id)
+    fake_engine.get_objection.return_value = objection
     fake_engine.submit_response.return_value = SubmitResponseResult(
         persisted=True, validation=ValidationResult(level="PASS", reason=None),
     )
 
     agent.confirm_response(
-        objection=objection, response_text="Înțeleg, poate fi o investiție.",
-        response_variant_used="CALDA",
+        objection_id=objection_id, owner_id=owner_id,
+        response_text="Înțeleg, poate fi o investiție.", response_variant_used="CALDA",
+    )
+
+    fake_engine.get_objection.assert_called_once_with(
+        objection_id=objection_id, owner_id=owner_id,
+    )
+
+
+def test_confirm_response_apeleaza_submit_response_cu_datele_din_objection_citita(agent, fake_engine):
+    """
+    submit_response() primeste objection_category/objection_text EXCLUSIV din
+    Objection-ul citit fresh din DB (get_objection) — niciodata din input-ul
+    original al lui confirm_response(), care nici nu le mai accepta ca parametri.
+    """
+    objection_id = uuid4()
+    owner_id = uuid4()
+    objection = _make_objection(objection_id=objection_id, owner_id=owner_id)
+    fake_engine.get_objection.return_value = objection
+    fake_engine.submit_response.return_value = SubmitResponseResult(
+        persisted=True, validation=ValidationResult(level="PASS", reason=None),
+    )
+
+    agent.confirm_response(
+        objection_id=objection_id, owner_id=owner_id,
+        response_text="Înțeleg, poate fi o investiție.", response_variant_used="CALDA",
     )
 
     fake_engine.submit_response.assert_called_once_with(
@@ -221,13 +251,16 @@ def test_confirm_response_apeleaza_submit_response_cu_datele_din_objection_persi
 
 
 def test_confirm_response_pass_returneaza_persisted_true(agent, fake_engine):
-    objection = _make_objection()
+    objection_id = uuid4()
+    owner_id = uuid4()
+    fake_engine.get_objection.return_value = _make_objection(objection_id, owner_id)
     fake_engine.submit_response.return_value = SubmitResponseResult(
         persisted=True, validation=ValidationResult(level="PASS", reason=None),
     )
 
     result = agent.confirm_response(
-        objection=objection, response_text="text ok", response_variant_used="DIRECTA",
+        objection_id=objection_id, owner_id=owner_id,
+        response_text="text ok", response_variant_used="DIRECTA",
     )
 
     assert isinstance(result, ConfirmResponseResult)
@@ -237,14 +270,17 @@ def test_confirm_response_pass_returneaza_persisted_true(agent, fake_engine):
 
 
 def test_confirm_response_block_returneaza_persisted_false_cu_motiv(agent, fake_engine):
-    objection = _make_objection()
+    objection_id = uuid4()
+    owner_id = uuid4()
+    fake_engine.get_objection.return_value = _make_objection(objection_id, owner_id)
     fake_engine.submit_response.return_value = SubmitResponseResult(
         persisted=False,
         validation=ValidationResult(level="BLOCK", reason="Promisiune nerealistă."),
     )
 
     result = agent.confirm_response(
-        objection=objection, response_text="Îți garantez câștig.", response_variant_used="CALDA",
+        objection_id=objection_id, owner_id=owner_id,
+        response_text="Îți garantez câștig.", response_variant_used="CALDA",
     )
 
     assert result.persisted is False
@@ -253,14 +289,17 @@ def test_confirm_response_block_returneaza_persisted_false_cu_motiv(agent, fake_
 
 
 def test_confirm_response_human_review_persista_dar_semnaleaza(agent, fake_engine):
-    objection = _make_objection()
+    objection_id = uuid4()
+    owner_id = uuid4()
+    fake_engine.get_objection.return_value = _make_objection(objection_id, owner_id)
     fake_engine.submit_response.return_value = SubmitResponseResult(
         persisted=True,
         validation=ValidationResult(level="HUMAN_REVIEW", reason="Testimoniale neverificabile."),
     )
 
     result = agent.confirm_response(
-        objection=objection, response_text="De ce întrebi?", response_variant_used="INTREBARE",
+        objection_id=objection_id, owner_id=owner_id,
+        response_text="De ce întrebi?", response_variant_used="INTREBARE",
     )
 
     assert result.persisted is True
@@ -268,16 +307,38 @@ def test_confirm_response_human_review_persista_dar_semnaleaza(agent, fake_engin
     assert result.reason == "Testimoniale neverificabile."
 
 
-def test_confirm_response_propaga_objection_not_found_error(agent, fake_engine):
-    """ObjectionNotFoundError propaga neprinsa — ConversationAgent nu o traduce."""
+def test_confirm_response_propaga_objection_not_found_error_din_get_objection(agent, fake_engine):
+    """
+    Daca get_objection() esueaza (id inexistent SAU owner gresit),
+    ObjectionNotFoundError propaga neprinsa — submit_response() nici nu
+    mai e apelat.
+    """
     from src.engines.objection.objection_engine import ObjectionNotFoundError
 
-    objection = _make_objection()
+    fake_engine.get_objection.side_effect = ObjectionNotFoundError("nu exista")
+
+    with pytest.raises(ObjectionNotFoundError):
+        agent.confirm_response(
+            objection_id=uuid4(), owner_id=uuid4(),
+            response_text="text", response_variant_used="CALDA",
+        )
+
+    fake_engine.submit_response.assert_not_called()
+
+
+def test_confirm_response_propaga_objection_not_found_error_din_submit_response(agent, fake_engine):
+    """ObjectionNotFoundError poate veni si din submit_response() (rar, dar posibil) — propaga la fel."""
+    from src.engines.objection.objection_engine import ObjectionNotFoundError
+
+    objection_id = uuid4()
+    owner_id = uuid4()
+    fake_engine.get_objection.return_value = _make_objection(objection_id, owner_id)
     fake_engine.submit_response.side_effect = ObjectionNotFoundError("nu exista")
 
     with pytest.raises(ObjectionNotFoundError):
         agent.confirm_response(
-            objection=objection, response_text="text", response_variant_used="CALDA",
+            objection_id=objection_id, owner_id=owner_id,
+            response_text="text", response_variant_used="CALDA",
         )
 
 
