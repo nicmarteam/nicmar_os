@@ -17,6 +17,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import psycopg.errors
 import pytest
 
 from src.data.db import get_connection
@@ -28,7 +29,7 @@ from src.agents.followup.followup_agent import FollowUpAgent
 from src.engines.partner.partner_engine import PartnerEngine, PartnerAccessDeniedError
 from src.agents.partner.partner_agent import PartnerAgent
 from src.agents.contact.contact_agent import ContactAgent
-from src.engines.objection.objection_engine import ObjectionEngine, ObjectionNotFoundError
+from src.engines.objection.objection_engine import Objection, ObjectionEngine, ObjectionNotFoundError
 
 
 pytestmark = pytest.mark.skipif(
@@ -513,8 +514,8 @@ class TestContactAgentOnRealPostgres:
 class TestObjectionEngineOnRealPostgres:
     """
     Valideaza fluxul complet ObjectionEngine pe PostgreSQL real: creare
-    obiectie, clasificare, submit_response cu persistare reala,
-    izolare owner_id, si BLOCK care nu scrie nimic.
+    obiectie (create_objection, Decizia 2A), clasificare, submit_response
+    cu persistare reala, izolare owner_id, si BLOCK care nu scrie nimic.
     """
 
     def _create_objection(self, owner_id, category, text):
@@ -524,6 +525,23 @@ class TestObjectionEngineOnRealPostgres:
                     "INSERT INTO objections (owner_id, objection_category, objection_text) "
                     "VALUES (%s, %s, %s) RETURNING id",
                     (owner_id, category, text),
+                )
+                return cur.fetchone()[0]
+
+    def _create_conversation(self, owner_id):
+        """Creeaza un contact + o conversatie reala, pentru testele cu conversation_id valid."""
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO contacts (owner_id, full_name, status) "
+                    "VALUES (%s, %s, 'ACTIVE') RETURNING id",
+                    (owner_id, "Contact Test Objection"),
+                )
+                contact_id = cur.fetchone()[0]
+                cur.execute(
+                    "INSERT INTO conversations (owner_id, contact_id, channel, status) "
+                    "VALUES (%s, %s, 'WHATSAPP', 'ACTIVE') RETURNING id",
+                    (owner_id, contact_id),
                 )
                 return cur.fetchone()[0]
 
@@ -620,3 +638,119 @@ class TestObjectionEngineOnRealPostgres:
 
         assert result.persisted is True
         assert result.validation.level == "PASS"
+
+    # ------------------------------------------------------------------
+    # create_objection() — Decizia 2A, 20-2A-create-objection-contract.md
+    # ------------------------------------------------------------------
+
+    def test_create_objection_insert_real_toate_campurile(self):
+        """INSERT real -> gen_random_uuid() -> RETURNING -> Objection complet."""
+        owner_id = _create_user("objection-create")
+        engine = ObjectionEngine()
+
+        objection = engine.create_objection(
+            owner_id=owner_id,
+            objection_text="Mi se pare cam scump.",
+            objection_category="PRET",
+        )
+
+        assert isinstance(objection, Objection)
+        assert objection.id is not None
+        assert objection.owner_id == owner_id
+        assert objection.conversation_id is None
+        assert objection.objection_category == "PRET"
+        assert objection.objection_text == "Mi se pare cam scump."
+        assert objection.resolution_status == "OPEN"
+
+        # Verificare independenta, direct din DB — nu ne bazam doar pe RETURNING
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT owner_id, conversation_id, objection_category, "
+                    "objection_text, resolution_status FROM objections WHERE id = %s",
+                    (objection.id,),
+                )
+                row = cur.fetchone()
+
+        assert row == (owner_id, None, "PRET", "Mi se pare cam scump.", "OPEN")
+
+    def test_create_objection_conversation_id_none_acceptat_de_postgres(self):
+        """conversation_id=None -> coloana e efectiv NULL in DB, nu doar in Python."""
+        owner_id = _create_user("objection-create-noconv")
+        engine = ObjectionEngine()
+
+        objection = engine.create_objection(
+            owner_id=owner_id,
+            objection_text="Nu am incredere in structura.",
+            objection_category="INCREDERE_STRUCTURA",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT conversation_id FROM objections WHERE id = %s",
+                    (objection.id,),
+                )
+                assert cur.fetchone()[0] is None
+
+    def test_create_objection_cu_conversation_id_real(self):
+        """conversation_id valid -> INSERT reuseste, FK respectat."""
+        owner_id = _create_user("objection-create-conv")
+        conversation_id = self._create_conversation(owner_id)
+        engine = ObjectionEngine()
+
+        objection = engine.create_objection(
+            owner_id=owner_id,
+            objection_text="Ma mai gandesc.",
+            objection_category="AMANARE",
+            conversation_id=conversation_id,
+        )
+
+        assert objection.conversation_id == conversation_id
+
+    def test_create_objection_owner_invalid_ridica_fk_violation_real(self):
+        """owner_id inexistent -> psycopg.errors.ForeignKeyViolation propaga efectiv din Postgres."""
+        engine = ObjectionEngine()
+
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            engine.create_objection(
+                owner_id=uuid4(),  # nu exista in users
+                objection_text="e scump",
+                objection_category="PRET",
+            )
+
+    def test_create_objection_conversation_invalid_ridica_fk_violation_real(self):
+        """conversation_id inexistent -> psycopg.errors.ForeignKeyViolation propaga efectiv din Postgres."""
+        owner_id = _create_user("objection-create-badconv")
+        engine = ObjectionEngine()
+
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            engine.create_objection(
+                owner_id=owner_id,
+                objection_text="e scump",
+                objection_category="PRET",
+                conversation_id=uuid4(),  # nu exista in conversations
+            )
+
+    def test_create_objection_apeluri_identice_creeaza_doua_randuri_pe_postgres(self):
+        """Fara deduplicare (Decizia 2A): doua apeluri identice -> doua randuri reale distincte."""
+        owner_id = _create_user("objection-create-dup")
+        engine = ObjectionEngine()
+
+        first = engine.create_objection(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+        second = engine.create_objection(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+
+        assert first.id != second.id
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM objections "
+                    "WHERE owner_id = %s AND objection_category = 'PRET' AND objection_text = 'e scump'",
+                    (owner_id,),
+                )
+                assert cur.fetchone()[0] == 2
