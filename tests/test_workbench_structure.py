@@ -772,3 +772,50 @@ def test_fara_subresurse_priority(workbench_content):
         "/api/v1/priority/... — panoul Priority e strict read-only "
         "(contract 40, sectiunea 2)."
     )
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 45 (RED, 19 august 2026) — FollowUp DIS -> Workbench.
+# Sursa: 45-followup-dis-workbench-contract.md, sectiunea 5, criteriile 1-3.
+#
+# Scop strict: API -> UI. Nu se atinge formula DIS, producer-ul
+# FollowUp, DIS Mission sau ORE — doar conectarea unui endpoint deja
+# functional si testat (GET /api/v1/followups/dis-score) la Workbench.
+# ----------------------------------------------------------------------
+
+
+def test_contine_endpoint_followups_dis_score(workbench_content):
+    """Contract 45, criteriul 1."""
+    assert "/api/v1/followups/dis-score" in workbench_content
+
+
+def test_dis_followup_afisat_separat_de_dis_mission(workbench_content):
+    """
+    Contract 45, criteriul 2 + sectiunea 3: cele doua etichete trebuie
+    sa existe distinct, ca liderul sa inteleaga imediat ca vede DOUA
+    surse ale aceluiasi KPI, nu doi KPI diferiti.
+    """
+    assert "DIS — Misiuni" in workbench_content, (
+        "Eticheta 'DIS — Misiuni' trebuie sa existe explicit "
+        "(contract 45, sectiunea 3)."
+    )
+    assert "DIS — Follow-up-uri" in workbench_content, (
+        "Eticheta 'DIS — Follow-up-uri' trebuie sa existe explicit, "
+        "distincta de 'DIS — Misiuni' (contract 45, sectiunea 3)."
+    )
+
+
+def test_dis_followup_foloseste_method_get(workbench_content):
+    """
+    Contract 45, criteriul 3: apelul catre /api/v1/followups/dis-score
+    trebuie sa foloseasca explicit method: "GET" — verificat prin
+    extragerea optiunilor efective din apel, nu doar prezenta URL-ului
+    ca text (tipar identic cu testul /present de la Decizia 38).
+    """
+    options_block = _extract_apifetch_call_options_any_quote(
+        workbench_content, "/api/v1/followups/dis-score",
+    )
+    assert re.search(r'method\s*:\s*["\']GET["\']', options_block), (
+        'Apelul catre /api/v1/followups/dis-score trebuie sa foloseasca '
+        'explicit method: "GET".'
+    )
