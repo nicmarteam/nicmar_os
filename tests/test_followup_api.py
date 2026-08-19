@@ -263,6 +263,54 @@ def test_dis_score_after_create(client):
     assert response.json()["dis_score"] == 1.0
 
 
+# ----------------------------------------------------------------------
+# DECIZIA 45 (RED, 19 august 2026) — izolare owner pentru DIS FollowUp.
+# Sursa: 45-followup-dis-workbench-contract.md, sectiunea 5, criteriile 4-5.
+#
+# Gol identificat la audit: izolarea era garantata doar de filtrul SQL
+# (f.owner_id = %s), fara test HTTP dedicat cu doi lideri reali — spre
+# deosebire de toate celelalte endpoint-uri mutante din proiect.
+# ----------------------------------------------------------------------
+
+
+def test_owner_a_vede_exclusiv_dis_score_propriu(client):
+    """
+    Contract 45, criteriul 4: liderul A creeaza un follow-up (DIS scris
+    real), liderul B (autentificat separat) apeleaza GET /followups/dis-score
+    si NU primeste DIS-ul lui A.
+    """
+    owner_a, email_a, password_a = _create_user("dis-isolation-owner-a")
+    owner_b, email_b, password_b = _create_user("dis-isolation-owner-b")
+    headers_a = _headers(client, email_a, password_a)
+    headers_b = _headers(client, email_b, password_b)
+
+    contact_id, conversation_id = _create_contact_and_conversation(owner_a)
+    _create_followup(client, headers_a, contact_id, conversation_id)
+
+    response_b = client.get("/api/v1/followups/dis-score", headers=headers_b)
+    assert response_b.status_code == 200
+    assert response_b.json()["dis_score"] is None
+
+
+def test_owner_b_vede_exclusiv_dis_score_propriu(client):
+    """
+    Contract 45, criteriul 5: companion invers al testului anterior —
+    liderul B creeaza follow-up-ul, liderul A nu-i vede DIS-ul. Impreuna,
+    cele doua teste inchid golul de izolare identificat la audit.
+    """
+    owner_a, email_a, password_a = _create_user("dis-isolation-owner-a2")
+    owner_b, email_b, password_b = _create_user("dis-isolation-owner-b2")
+    headers_a = _headers(client, email_a, password_a)
+    headers_b = _headers(client, email_b, password_b)
+
+    contact_id, conversation_id = _create_contact_and_conversation(owner_b)
+    _create_followup(client, headers_b, contact_id, conversation_id)
+
+    response_a = client.get("/api/v1/followups/dis-score", headers=headers_a)
+    assert response_a.status_code == 200
+    assert response_a.json()["dis_score"] is None
+
+
 class TestInvalidFollowUpIdReturns422:
     INVALID_ID = "nu-e-un-uuid-valid"
 
