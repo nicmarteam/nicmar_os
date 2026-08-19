@@ -525,3 +525,152 @@ def test_eticheta_scoruri_nu_mentioneaza_partener_specific(workbench_content):
         "recente ale liderului, nu ale partenerului selectat (contract 37, "
         "sectiunea 6)."
     )
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 38 (RED, 19 august 2026) — Mission Workbench.
+# Sursa: 38-workbench-mission-contract.md, sectiunea 9.
+#
+# Conventie noua: implementarea GREEN trebuie sa delimiteze payload-urile
+# Mission intre marcaje explicite:
+#   // MISSION_CREATE_PAYLOAD_START ... // MISSION_CREATE_PAYLOAD_END
+#   // MISSION_START_PAYLOAD_START ... // MISSION_START_PAYLOAD_END
+#
+# Criteriul 12 din contract (owner_id nu apare niciunde) e acoperit de
+# testul existent test_owner_id_nu_apare_niciunde_in_fisier — regresie,
+# nu test nou. De aceea sunt 11 teste noi, nu 12.
+# ----------------------------------------------------------------------
+
+
+def test_contine_endpoint_post_missions(workbench_content):
+    """Contract 38, sectiunea 9, criteriul 1."""
+    assert "/api/v1/missions" in workbench_content
+
+
+def test_contine_endpoint_mission_assign(workbench_content):
+    """Contract 38, criteriul 2."""
+    assert re.search(r"/api/v1/missions/\$\{[^}]+\}/assign", workbench_content), (
+        "Lipseste template-ul de URL pentru POST /missions/{id}/assign."
+    )
+
+
+def _extract_apifetch_call_options(content: str, url_fragment: str) -> str:
+    """
+    Extrage blocul de optiuni {...} din primul apel
+    apiFetch(`...url_fragment...`, {...}). Folosit pentru verificarea
+    stricta a metodei HTTP (contract 38, criteriul 3) — nu ne oprim la
+    prezenta URL-ului ca text, verificam efectiv ce metoda foloseste
+    apelul respectiv.
+    """
+    pattern = r"apiFetch\(\s*`[^`]*" + re.escape(url_fragment) + r"[^`]*`\s*,\s*\{(.*?)\}\s*\)"
+    match = re.search(pattern, content, re.DOTALL)
+    assert match is not None, (
+        f"Apelul apiFetch pentru '{url_fragment}' nu a fost gasit in forma "
+        f"asteptata apiFetch(`...{url_fragment}...`, {{ ... }})."
+    )
+    return match.group(1)
+
+
+def test_contine_endpoint_mission_present_ca_get(workbench_content):
+    """
+    Contract 38, criteriul 3: /present trebuie sa fie GET, nu POST —
+    diferit de tiparul folosit la Objection/Partner. Verificarea extrage
+    optiunile efective din apelul apiFetch si confirma method: "GET"
+    chiar in acel apel, nu doar prezenta URL-ului undeva in fisier.
+    """
+    assert re.search(r"/api/v1/missions/\$\{[^}]+\}/present", workbench_content), (
+        "Lipseste template-ul de URL pentru GET /missions/{id}/present."
+    )
+    options_block = _extract_apifetch_call_options(workbench_content, "/present")
+    assert re.search(r'method\s*:\s*["\']GET["\']', options_block), (
+        'Apelul catre /present trebuie sa foloseasca explicit method: "GET" '
+        "(contract 38, sectiunea 4) — nu POST."
+    )
+
+
+def test_contine_endpoint_mission_start(workbench_content):
+    """Contract 38, criteriul 4."""
+    assert re.search(r"/api/v1/missions/\$\{[^}]+\}/start", workbench_content), (
+        "Lipseste template-ul de URL pentru POST /missions/{id}/start."
+    )
+
+
+def test_contine_endpoint_mission_complete(workbench_content):
+    """Contract 38, criteriul 5."""
+    assert re.search(r"/api/v1/missions/\$\{[^}]+\}/complete", workbench_content), (
+        "Lipseste template-ul de URL pentru POST /missions/{id}/complete."
+    )
+
+
+def test_contine_endpoint_dis_score(workbench_content):
+    """Contract 38, criteriul 6."""
+    assert "/api/v1/missions/dis-score" in workbench_content
+
+
+def test_mission_create_payload_contine_doar_title(workbench_content):
+    """
+    Contract 38, sectiunea 6 + criteriul 7: payload-ul POST /missions
+    contine EXACT title, fara description (desi engine-ul il accepta
+    intern ca parametru optional, router-ul nu-l expune), fara owner_id.
+    """
+    block = _extract_marked_block(workbench_content, "MISSION_CREATE_PAYLOAD")
+    assert "title" in block
+    assert "description" not in block
+    assert "owner_id" not in block
+
+
+def test_mission_start_payload_contine_doar_confirmed(workbench_content):
+    """Contract 38, criteriul 8."""
+    block = _extract_marked_block(workbench_content, "MISSION_START_PAYLOAD")
+    assert "confirmed" in block
+    assert "owner_id" not in block
+
+
+def test_zona_mission_activa_dupa_login_nu_dupa_contact(workbench_content):
+    """
+    Contract 38, sectiunea 3 + criteriul 9: panoul Mission exista cu
+    id="panel-mission" si este activat in functia login(), nu in
+    selectContact() — spre deosebire de Partner/FollowUp, Mission nu
+    depinde de currentContactId (verificat din audit: contact_id/
+    partner_id din missions nu sunt folosite nicaieri in engine/agent).
+    """
+    assert re.search(r'class="panel disabled"\s+id="panel-mission"', workbench_content), (
+        'Panoul Mission trebuie sa existe cu id="panel-mission" si clasa '
+        '"disabled" implicit in markup.'
+    )
+
+    login_match = re.search(r"async function login\(\)(.*?)\n  \}", workbench_content, re.DOTALL)
+    assert login_match is not None, "Functia login() nu a fost gasita in forma asteptata."
+    assert 'setPanelEnabled("panel-mission", true)' in login_match.group(1), (
+        "panel-mission trebuie activat direct in login(), nu conditionat de "
+        "selectContact() (contract 38, sectiunea 3)."
+    )
+
+
+def test_butoane_mission_conditionate_de_status(workbench_content):
+    """
+    Contract 38, criteriul 10: cele 4 stari trebuie verificate explicit
+    in cod (comparatie, nu doar text decorativ) — butoanele Mission se
+    activeaza/dezactiveaza in functie de status-ul real al misiunii.
+    """
+    for status in ("GENERATED", "ASSIGNED", "IN_PROGRESS", "COMPLETED"):
+        pattern = r'(===|==)\s*["\']' + status + r'["\']'
+        assert re.search(pattern, workbench_content), (
+            f"Starea '{status}' trebuie verificata explicit printr-o comparatie "
+            f"in cod (ex. status === '{status}'), nu doar mentionata ca text."
+        )
+
+
+def test_eticheta_dis_nu_mentioneaza_misiunea_curenta(workbench_content):
+    """
+    Contract 38, sectiunea 7 + criteriul 11: eticheta DIS trebuie sa
+    foloseasca formularea exacta din contract, ca sa reflecte ca
+    GET /missions/dis-score e agregat pe owner (cel mai recent DIS din
+    toate misiunile), nu pe misiunea curenta. Verificam fraza exacta —
+    nu "cele mai recente" generic, care ar putea aparea deja pentru
+    Partner scores fara sa insemne nimic pentru Mission.
+    """
+    assert "DIS-ul tău cel mai recent" in workbench_content, (
+        "Eticheta DIS trebuie sa foloseasca formularea exacta "
+        "'DIS-ul tău cel mai recent' (contract 38, sectiunea 7)."
+    )
