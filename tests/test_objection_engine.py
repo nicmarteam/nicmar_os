@@ -510,3 +510,86 @@ def test_get_objection_owner_gresit_ridica_aceeasi_eroare(engine):
 
         with pytest.raises(ObjectionNotFoundError):
             engine.get_objection(objection_id=uuid4(), owner_id=uuid4())
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 43 (RED, 19 august 2026) — evenimente ObjectionEngine.
+# Sursa: 43-objection-events-contract.md, sectiunea 5, criteriile 1-3.
+# Pattern identic cu test_creare_noua_emite_event_conversation_created
+# (tests/test_conversation_engine.py) si cu testele Decizia 42 (Contact).
+# ----------------------------------------------------------------------
+
+
+def test_create_objection_emite_event_objection_created(engine):
+    """Contract 43, criteriul 1."""
+    owner_id = uuid4()
+    objection_id = uuid4()
+
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event") as mock_emit:
+        mock_cur = _make_cursor_fetchone([
+            (objection_id, owner_id, None, "PRET", "e scump", "OPEN"),
+        ])
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.create_objection(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+
+        mock_emit.assert_called_once()
+        args = mock_emit.call_args[0]
+        assert args[0] == "ObjectionCreated"
+        assert args[1] == objection_id
+
+
+def test_submit_response_pass_emite_event_cu_persisted_true(engine):
+    """Contract 43, criteriul 2."""
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event") as mock_emit:
+        mock_cur = _make_cursor(rowcount=1)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.submit_response(
+            objection_id=uuid4(),
+            owner_id=uuid4(),
+            objection_category="PRET",
+            objection_text="e scump",
+            response_text="Înțeleg, chiar poate părea o investiție.",
+            response_variant_used="CALDA",
+        )
+
+        mock_emit.assert_called_once()
+        args = mock_emit.call_args[0]
+        assert args[0] == "ObjectionResponseSubmitted"
+        payload = args[2]
+        assert payload["persisted"] is True
+        assert payload["validation_level"] == "PASS"
+
+
+def test_submit_response_block_emite_event_cu_persisted_false(engine):
+    """
+    Contract 43, criteriul 3: evenimentul TREBUIE emis si pe ramura BLOCK,
+    desi nimic nu se scrie in objections — BLOCK e o decizie reala de
+    business, nu absenta unei actiuni (decizie aprobata explicit).
+    """
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event") as mock_emit:
+        mock_cur = _make_cursor()
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = engine.submit_response(
+            objection_id=uuid4(),
+            owner_id=uuid4(),
+            objection_category="PRET",
+            objection_text="e scump",
+            response_text="Îți garantez că vei câștiga bani.",
+            response_variant_used="CALDA",
+        )
+
+        assert result.persisted is False
+        mock_emit.assert_called_once()
+        args = mock_emit.call_args[0]
+        assert args[0] == "ObjectionResponseSubmitted"
+        payload = args[2]
+        assert payload["persisted"] is False
+        assert payload["validation_level"] == "BLOCK"
