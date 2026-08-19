@@ -229,3 +229,23 @@ class ContactSummaryResponse(BaseModel):
     pip: Optional[float]
     reason: str
     partner_id: Optional[UUID]
+
+
+# ------------------------------------------------------------------
+# Priority — sursă: 39-priority-api-contract.md
+# ------------------------------------------------------------------
+
+class PrioritizedActivityResponse(BaseModel):
+    """
+    Mapare directă a câmpurilor publice din PrioritizedActivity
+    (src/engines/priority/priority_engine.py). `priority_key` (tuplul
+    intern folosit pentru sortare) NU e expus — e complet derivabil din
+    impact/urgency/vechime_seconds, deja prezente aici (contract 39,
+    secțiunea 4).
+    """
+    entity_type: str
+    entity_id: UUID
+    title: str
+    impact: float
+    urgency: float
+    vechime_seconds: float
