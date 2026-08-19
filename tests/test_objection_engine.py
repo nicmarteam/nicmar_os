@@ -80,7 +80,8 @@ def test_get_variants_deleaga_la_library(engine):
 
 
 def test_submit_response_block_nu_scrie_in_db(engine):
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor()
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -107,7 +108,8 @@ def test_submit_response_pass_scrie_response_text_si_variant(engine):
     owner_id = uuid4()
     objection_id = uuid4()
 
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor(rowcount=1)
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -141,7 +143,8 @@ def test_submit_response_pass_scrie_response_text_si_variant(engine):
 def test_submit_response_filtreaza_owner_id_in_where(engine):
     owner_id = uuid4()
 
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor(rowcount=1)
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -185,7 +188,8 @@ def test_submit_response_obiectie_inexistenta_ridica_eroare(engine):
 
 
 def test_submit_response_partial_validation_tot_persista(engine):
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor(rowcount=1)
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -211,7 +215,8 @@ def test_submit_response_partial_validation_tot_persista(engine):
 def test_submit_response_pastreaza_exact_variant_used_trimis(engine):
     """Editarea response_text nu schimba response_variant_used - motorul
     persista exact ce i se transmite, nu recalculeaza originea."""
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor(rowcount=1)
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -254,7 +259,8 @@ def test_create_objection_fara_conversation_id(engine):
     owner_id = uuid4()
     objection_id = uuid4()
 
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor_fetchone([
             (objection_id, owner_id, None, "PRET", "e scump", "OPEN"),
         ])
@@ -290,7 +296,8 @@ def test_create_objection_cu_conversation_id(engine):
     conversation_id = uuid4()
     objection_id = uuid4()
 
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor_fetchone([
             (objection_id, owner_id, conversation_id, "TIMP", "nu am timp", "OPEN"),
         ])
@@ -390,7 +397,8 @@ def test_create_objection_apeluri_identice_creeaza_doua_randuri(engine):
     first_id = uuid4()
     second_id = uuid4()
 
-    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.objection.objection_engine.get_connection") as mock_get_conn, \
+         patch.object(ObjectionEngine, "_emit_event"):
         mock_cur = _make_cursor_fetchone([
             (first_id, owner_id, None, "PRET", "e scump", "OPEN"),
             (second_id, owner_id, None, "PRET", "e scump", "OPEN"),
