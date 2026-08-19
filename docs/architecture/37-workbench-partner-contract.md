@@ -1,527 +1,159 @@
-"""
-Teste RED structurale pentru Objection Workbench (apps/workbench/index.html).
-
-Sursa: 27-objection-workbench-contract.md, sectiunea 7, Nivel 1.
-
-IMPORTANT: acestea NU sunt teste de comportament in browser (repo-ul nu
-are Jest/Playwright/Selenium — decizie explicita, contract sectiunea 7).
-Sunt verificari STATICE ale continutului fisierului, ca text — confirma
-ca structura respecta contractul (endpoint-uri, payload-uri, absenta
-localStorage, absenta SQL/Python, absenta owner_id in JS).
-
-Conventie folosita pentru testabilitate: implementarea GREEN trebuie sa
-delimiteze constructia payload-ului pentru /confirm intre marcaje
-explicite in comentarii JS:
-    // CONFIRM_PAYLOAD_START
-    ...
-    // CONFIRM_PAYLOAD_END
-astfel incat testul sa poata verifica STRICT ca acel bloc contine doar
-response_text/response_variant_used/objection_id, fara
-objection_category/objection_text/owner_id — desi acestea din urma apar
-legitim in alte parti ale fisierului (ex. la /analyze, /prepare).
-"""
-
-import re
-from pathlib import Path
-
-import pytest
-
-WORKBENCH_PATH = Path(__file__).parent.parent / "apps" / "workbench" / "index.html"
-
-
-@pytest.fixture
-def workbench_content():
-    if not WORKBENCH_PATH.exists():
-        pytest.fail(f"Fișierul {WORKBENCH_PATH} nu există încă.")
-    return WORKBENCH_PATH.read_text(encoding="utf-8")
-
-
-# ----------------------------------------------------------------------
-# Existenta fisierului
-# ----------------------------------------------------------------------
-
-
-def test_workbench_exista():
-    assert WORKBENCH_PATH.exists(), f"Fișierul {WORKBENCH_PATH} nu există încă."
-
-
-def test_workbench_este_fisier_unic_html():
-    """MVP — un singur fisier, fara fisiere JS/CSS separate langa el."""
-    workbench_dir = WORKBENCH_PATH.parent
-    assert workbench_dir.exists()
-    files = list(workbench_dir.iterdir())
-    assert files == [WORKBENCH_PATH], f"Fișiere neașteptate în {workbench_dir}: {files}"
-
-
-# ----------------------------------------------------------------------
-# Endpoint-urile — toate 5 (login + 4 objections)
-# ----------------------------------------------------------------------
-
-
-def test_contine_endpoint_login(workbench_content):
-    assert "/api/v1/auth/login" in workbench_content
-
-
-def test_contine_endpoint_analyze(workbench_content):
-    assert "/api/v1/objections/analyze" in workbench_content
-
-
-def test_contine_endpoint_categories(workbench_content):
-    assert "/api/v1/objections/categories" in workbench_content
-
-
-def test_contine_endpoint_prepare(workbench_content):
-    assert "/api/v1/objections/prepare" in workbench_content
-
-
-def test_contine_endpoint_confirm(workbench_content):
-    assert "/api/v1/objections/confirm" in workbench_content
-
-
-def test_contine_endpoint_get_contacts(workbench_content):
-    """Decizia 34: Workbench trebuie sa incarce lista de contacte."""
-    assert "/api/v1/contacts" in workbench_content
-
-
-def test_contine_endpoint_post_conversations(workbench_content):
-    """Decizia 34: Workbench trebuie sa creeze/obtina conversatia reala."""
-    assert "/api/v1/conversations" in workbench_content
-
-
-def test_contine_endpoint_followups(workbench_content):
-    """Decizia 36: Workbench trebuie sa creeze/listeze follow-up-uri."""
-    assert "/api/v1/followups" in workbench_content
-
-
-def test_contine_endpoint_followup_complete(workbench_content):
-    assert "/complete" in workbench_content
-
-
-def test_contine_endpoint_followup_postpone(workbench_content):
-    assert "/postpone" in workbench_content
-
-
-def test_contine_endpoint_followup_reschedule(workbench_content):
-    assert "/reschedule" in workbench_content
-
-
-def test_toate_fetch_urile_folosesc_doar_api_v1(workbench_content):
-    """
-    Niciun fetch()/apiFetch() nu tinteste altceva decat /api/v1/... —
-    Workbench-ul nu poate ocoli API-ul catre un endpoint Python intern
-    sau alta cale. Regex-ul prinde ambele forme (fetch si apiFetch,
-    ambele contin substring-ul "etch(").
-    """
-    fetch_calls = re.findall(r"etch\(\s*[`'\"]([^`'\"]+)[`'\"]", workbench_content)
-    assert len(fetch_calls) >= 5, f"Prea puține apeluri fetch()/apiFetch() găsite: {fetch_calls}"
-    for url in fetch_calls:
-        assert "/api/v1/" in url, f"fetch() către un endpoint neconform: {url}"
-
-
-# ----------------------------------------------------------------------
-# Payload-uri — campurile obligatorii
-# ----------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("field", [
-    "objection_text", "objection_category", "objection_id",
-    "response_text", "response_variant_used",
-])
-def test_contine_campul_payload(workbench_content, field):
-    assert field in workbench_content
-
-
-# ----------------------------------------------------------------------
-# Securitatea payload-ului /confirm — control suplimentar cerut explicit
-# ----------------------------------------------------------------------
-
-
-def _extract_confirm_payload_block(content: str) -> str:
-    match = re.search(
-        r"//\s*CONFIRM_PAYLOAD_START(.*?)//\s*CONFIRM_PAYLOAD_END",
-        content, re.DOTALL,
-    )
-    assert match is not None, (
-        "Marcajele CONFIRM_PAYLOAD_START/CONFIRM_PAYLOAD_END lipsesc — "
-        "necesare pentru verificarea strictă a payload-ului /confirm."
-    )
-    return match.group(1)
-
-
-def test_confirm_payload_nu_contine_objection_category(workbench_content):
-    block = _extract_confirm_payload_block(workbench_content)
-    assert "objection_category" not in block
-
-
-def test_confirm_payload_nu_contine_objection_text(workbench_content):
-    block = _extract_confirm_payload_block(workbench_content)
-    assert "objection_text" not in block
-
-
-def test_confirm_payload_contine_doar_campurile_permise(workbench_content):
-    block = _extract_confirm_payload_block(workbench_content)
-    assert "response_text" in block
-    assert "response_variant_used" in block
-    assert "objection_id" in block
-
-
-# ----------------------------------------------------------------------
-# Payload /prepare — Decizia 34: conversation_id trebuie sa fie
-# variabila reala (currentConversationId), NU literal null hardcodat
-# ----------------------------------------------------------------------
-
-
-def _extract_prepare_payload_block(content: str) -> str:
-    match = re.search(
-        r"//\s*PREPARE_PAYLOAD_START(.*?)//\s*PREPARE_PAYLOAD_END",
-        content, re.DOTALL,
-    )
-    assert match is not None, (
-        "Marcajele PREPARE_PAYLOAD_START/PREPARE_PAYLOAD_END lipsesc — "
-        "necesare pentru verificarea stricta ca conversation_id nu mai e null hardcodat."
-    )
-    return match.group(1)
-
-
-def test_prepare_payload_foloseste_current_conversation_id(workbench_content):
-    block = _extract_prepare_payload_block(workbench_content)
-    assert "currentConversationId" in block
-
-
-def test_prepare_payload_nu_mai_are_null_hardcodat(workbench_content):
-    """
-    Regresie fata de starea dinainte de Decizia 34: conversation_id NU
-    mai e literalul 'null' — trebuie sa fie variabila reala.
-    """
-    block = _extract_prepare_payload_block(workbench_content)
-    assert "conversation_id: null" not in block
-    assert "conversation_id: currentConversationId" in block
-
-
-# ----------------------------------------------------------------------
-# Payload /followups — Decizia 36: trebuie sa reutilizeze
-# currentContactId/currentConversationId, nu valori noi
-# ----------------------------------------------------------------------
-
-
-def _extract_followup_payload_block(content: str) -> str:
-    match = re.search(
-        r"//\s*FOLLOWUP_PAYLOAD_START(.*?)//\s*FOLLOWUP_PAYLOAD_END",
-        content, re.DOTALL,
-    )
-    assert match is not None, (
-        "Marcajele FOLLOWUP_PAYLOAD_START/FOLLOWUP_PAYLOAD_END lipsesc — "
-        "necesare pentru verificarea ca payload-ul reutilizeaza starea Contact/Conversation."
-    )
-    return match.group(1)
-
-
-def test_followup_payload_reutilizeaza_current_contact_id(workbench_content):
-    block = _extract_followup_payload_block(workbench_content)
-    assert "currentContactId" in block
-
-
-def test_followup_payload_reutilizeaza_current_conversation_id(workbench_content):
-    block = _extract_followup_payload_block(workbench_content)
-    assert "currentConversationId" in block
-
-
-def test_followup_payload_nu_contine_objection_id(workbench_content):
-    """Decizia 36, sectiunea 6: fara legatura cu Objection."""
-    block = _extract_followup_payload_block(workbench_content)
-    assert "objection_id" not in block
-
-
-def test_are_guard_pentru_contact_si_conversation_la_creare_followup(workbench_content):
-    """
-    Decizia 36, sectiunea 4: crearea unui follow-up trebuie blocata daca
-    lipseste currentContactId SAU currentConversationId — verificare
-    structurala a guard-ului (nu doar prezenta variabilelor undeva).
-    """
-    assert "!currentContactId" in workbench_content
-    assert "!currentConversationId" in workbench_content
-
-
-# ----------------------------------------------------------------------
-# owner_id — NICIODATA in JS, in nicio forma
-# ----------------------------------------------------------------------
-
-
-def test_owner_id_nu_apare_niciunde_in_fisier(workbench_content):
-    """
-    owner_id nu trebuie sa apara NICIUNDE in Workbench — nici macar in
-    comentarii — identitatea vine exclusiv din JWT, procesat server-side.
-    """
-    assert "owner_id" not in workbench_content
-
-
-# ----------------------------------------------------------------------
-# Token — memorie runtime, NICIODATA persistat
-# ----------------------------------------------------------------------
-
-
-def test_nu_foloseste_local_storage(workbench_content):
-    assert "localStorage" not in workbench_content
-
-
-def test_nu_foloseste_session_storage(workbench_content):
-    assert "sessionStorage" not in workbench_content
-
-
-def test_nu_seteaza_cookie_nou(workbench_content):
-    assert "document.cookie" not in workbench_content
-
-
-def test_foloseste_authorization_bearer_header(workbench_content):
-    assert "Authorization" in workbench_content
-    assert "Bearer" in workbench_content
-
-
-def test_parola_nu_e_persistata_dupa_login(workbench_content):
-    """
-    Camp de parola prezent (pentru formularul de login), dar niciun
-    identificator JS care ar sugera stocarea ei (ex. `savedPassword`,
-    `password =` in afara requestului de login e greu de verificat static
-    complet — verificam macar ca nu e scrisa in localStorage/sessionStorage,
-    deja acoperit de testele de mai sus).
-    """
-    assert 'type="password"' in workbench_content
-
-
-# ----------------------------------------------------------------------
-# Fara acces direct la DB sau cod Python
-# ----------------------------------------------------------------------
-
-
-def test_fara_conexiune_postgresql_directa(workbench_content):
-    assert "postgresql://" not in workbench_content
-    assert "psycopg" not in workbench_content
-
-
-def test_fara_sql_brut(workbench_content):
-    for keyword in ("SELECT ", "INSERT INTO", "UPDATE ", "DELETE FROM"):
-        assert keyword not in workbench_content
-
-
-def test_fara_importuri_python(workbench_content):
-    assert "import src." not in workbench_content
-    assert "from src." not in workbench_content
-
-
-# ----------------------------------------------------------------------
-# Cele 3 faze — elemente obligatorii vizibile
-# ----------------------------------------------------------------------
-
-
-def test_are_camp_pentru_textul_obiectiei(workbench_content):
-    assert "objection_text" in workbench_content  # deja verificat, dar explicit per faza
-
-
-def test_are_gestionare_needs_manual_selection(workbench_content):
-    assert "needs_manual_selection" in workbench_content
-
-
-def test_are_cele_trei_variante_numite(workbench_content):
-    for variant in ("CALDA", "DIRECTA", "INTREBARE"):
-        assert variant in workbench_content
-
-
-# ----------------------------------------------------------------------
-# Cele 4 niveluri Safety Validation — toate randate distinct
-# ----------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("level", ["PASS", "BLOCK", "PARTIAL_VALIDATION", "HUMAN_REVIEW"])
-def test_gestioneaza_nivel_validare(workbench_content, level):
-    assert level in workbench_content
-
-
-def test_block_nu_e_tratat_ca_eroare_tehnica(workbench_content):
-    """
-    Verificare cel puţin structurală: langa BLOCK trebuie sa existe un
-    mesaj despre siguranta/motiv, nu un text generic de eroare de tip
-    500/eroare de server — cautam macar cuvantul "reason" (folosit pentru
-    a afisa motivul) in vecinatatea gestionarii BLOCK, nu doar undeva in fisier.
-    """
-    assert "reason" in workbench_content
-
-
-# ----------------------------------------------------------------------
-# DECIZIA 37 (RED, 19 august 2026) — Partner Workbench.
-# Sursa: 37-workbench-partner-contract.md, sectiunea 8.
-#
-# Conventie noua pentru testabilitate stricta, identica cu marcajele
-# deja folosite la /confirm, /prepare, /followups: implementarea GREEN
-# trebuie sa delimiteze payload-urile Partner intre marcaje explicite:
-#   // PARTNER_CREATE_PAYLOAD_START ... // PARTNER_CREATE_PAYLOAD_END
-#   // PARTNER_DIAGNOSTIC_PAYLOAD_START ... // PARTNER_DIAGNOSTIC_PAYLOAD_END
-#   // PARTNER_SEND_PAYLOAD_START ... // PARTNER_SEND_PAYLOAD_END
-# ----------------------------------------------------------------------
-
-
-# ------------------------------------------------------------------
-# Endpoint-urile — toate 4, ca string literal in fetch()/apiFetch()
-# ------------------------------------------------------------------
-
-
-def test_contine_endpoint_post_partners(workbench_content):
-    """Contract 37, sectiunea 8, criteriul 1."""
-    assert "/api/v1/partners" in workbench_content
-
-
-def test_contine_endpoint_partner_diagnostic(workbench_content):
-    """
-    Contract 37, criteriul 2. Verificam pattern-ul de URL template
-    folosit deja la followups (`/${followupId}/complete`), aplicat
-    aici pentru diagnostic — nu un literal fix, pentru ca partner_id
-    e dinamic.
-    """
-    assert "/diagnostic" in workbench_content
-    assert re.search(r"/api/v1/partners/\$\{[^}]+\}/diagnostic", workbench_content), (
-        "Lipseste template-ul de URL pentru POST /partners/{id}/diagnostic."
-    )
-
-
-def test_contine_endpoint_partner_send(workbench_content):
-    """Contract 37, criteriul 3."""
-    assert re.search(r"/api/v1/partners/\$\{[^}]+\}/send", workbench_content), (
-        "Lipseste template-ul de URL pentru POST /partners/{id}/send."
-    )
-
-
-def test_contine_endpoint_partner_scores(workbench_content):
-    """Contract 37, criteriul 4."""
-    assert "/api/v1/partners/scores" in workbench_content
-
-
-# ------------------------------------------------------------------
-# Payload-uri exacte — contract sectiunea 5
-# ------------------------------------------------------------------
-
-
-def _extract_marked_block(content: str, marker_name: str) -> str:
-    """Extrage blocul dintre `// {marker_name}_START` si `// {marker_name}_END`."""
-    match = re.search(
-        rf"//\s*{marker_name}_START(.*?)//\s*{marker_name}_END",
-        content, re.DOTALL,
-    )
-    assert match is not None, (
-        f"Marcajele {marker_name}_START/{marker_name}_END lipsesc — "
-        f"necesare pentru verificarea stricta a payload-ului (contract 37, sectiunea 5)."
-    )
-    return match.group(1)
-
-
-def test_partner_create_payload_contine_doar_contact_id(workbench_content):
-    """
-    Contract 37, sectiunea 5 + criteriul 5: payload-ul POST /partners
-    contine EXACT contact_id, fara owner_id, fara status/partner_level
-    (acestea sunt hardcodate server-side, nu trimise de client).
-    """
-    block = _extract_marked_block(workbench_content, "PARTNER_CREATE_PAYLOAD")
-    assert "contact_id" in block
-    assert "owner_id" not in block
-    assert "status" not in block
-    assert "partner_level" not in block
-
-
-def test_diagnostic_payload_contine_doar_diagnostic_type(workbench_content):
-    """Contract 37, criteriul 6."""
-    block = _extract_marked_block(workbench_content, "PARTNER_DIAGNOSTIC_PAYLOAD")
-    assert "diagnostic_type" in block
-    assert "owner_id" not in block
-    assert "partner_id" not in block, (
-        "partner_id vine din URL (path param), nu trebuie duplicat in body."
-    )
-
-
-def test_send_payload_contine_doar_confirmed(workbench_content):
-    """Contract 37, criteriul 7."""
-    block = _extract_marked_block(workbench_content, "PARTNER_SEND_PAYLOAD")
-    assert "confirmed" in block
-    assert "owner_id" not in block
-
-
-# ------------------------------------------------------------------
-# Cele 4 diagnostic_type — exact, fara inventii
-# ------------------------------------------------------------------
-
-
-def test_cele_patru_diagnostic_types_prezente(workbench_content):
-    """
-    Contract 37, sectiunea 5 + criteriul 8: exact cele 4 valori din
-    VALID_DIAGNOSTIC_TYPES (src/engines/partner/partner_engine.py),
-    hardcodate in UI ca optiuni de selectie.
-    """
-    for diagnostic_type in ("ENCOURAGEMENT", "CLARITY", "APPRECIATION", "NEXT_STEP"):
-        assert diagnostic_type in workbench_content, (
-            f"Tipul de diagnostic '{diagnostic_type}' lipseste din Workbench."
-        )
-
-
-# ------------------------------------------------------------------
-# Sursa de adevar pentru partner_id — sectiunea 3 din contract
-# ------------------------------------------------------------------
-
-
-def test_partner_id_nu_e_citit_din_local_storage(workbench_content):
-    """
-    Contract 37, sectiunea 3, criteriul 9: currentPartnerId nu e o
-    sursa independenta persistenta — nu se citeste din storage.
-    Regula generala (localStorage/sessionStorage) e deja verificata de
-    test_nu_foloseste_local_storage/test_nu_foloseste_session_storage;
-    aici verificam explicit ca variabila runtime exista si ca sursa ei
-    e fie contact.partner_id, fie response.id (dupa creare) — nu storage.
-    """
-    assert "currentPartnerId" in workbench_content
-    assert "localStorage" not in workbench_content
-    assert "sessionStorage" not in workbench_content
-    assert re.search(r"currentPartnerId\s*=\s*contact\.partner_id", workbench_content), (
-        "currentPartnerId trebuie populat din contact.partner_id pentru "
-        "un contact deja convertit (contract 37, sectiunea 3/4)."
-    )
-
-
-def test_zona_partner_ascunsa_fara_contact_selectat(workbench_content):
-    """
-    Contract 37, criteriul 11: panoul Partner are clasa `disabled` in
-    markup implicit, identic cu panel-analyze/panel-followup — nicio
-    actiune Partner posibila inainte de selectarea unui contact.
-    """
-    assert re.search(r'class="panel disabled"\s+id="panel-partner"', workbench_content), (
-        "Panoul Partner trebuie sa existe cu id=\"panel-partner\" si clasa "
-        "\"disabled\" implicit in markup, identic cu celelalte zone dependente "
-        "de currentContactId."
-    )
-
-
-# ------------------------------------------------------------------
-# Onestitate fata de lider — mesaj STUB si etichetare scoruri
-# ------------------------------------------------------------------
-
-
-def test_mesaj_stub_afisat_ca_atare(workbench_content):
-    """
-    Contract 37, sectiunea 6 + criteriul 12: textul [STUB] returnat de
-    server e afisat ca atare, nu filtrat printr-un .replace() care l-ar
-    ascunde de lider.
-    """
-    assert "[STUB]" in workbench_content
-    assert ".replace(" not in workbench_content or not re.search(
-        r'\.replace\([^)]*STUB[^)]*\)', workbench_content
-    ), "Mesajul [STUB] nu trebuie filtrat/ascuns printr-un .replace()."
-
-
-def test_eticheta_scoruri_nu_mentioneaza_partener_specific(workbench_content):
-    """
-    Contract 37, sectiunea 6 + criteriul 13: eticheta afisata pentru
-    scoruri trebuie sa reflecte limitarea reala a API-ului
-    (GET /partners/scores e agregat pe owner, nu pe partenerul
-    selectat) — "cele mai recente ale tale", nu "scorul partenerului".
-    """
-    assert "cele mai recente" in workbench_content.lower() or \
-        "recente ale tale" in workbench_content.lower(), (
-        "Eticheta scorurilor trebuie sa indice explicit ca sunt cele mai "
-        "recente ale liderului, nu ale partenerului selectat (contract 37, "
-        "sectiunea 6)."
-    )
+# Decizia 37 — Partner Workbench
+
+Status: APPROVED (owner, 19 august 2026)
+
+## 1. Context
+
+Backend-ul Partner e complet și testat (Decizia 32): 4 endpoint-uri,
+`PartnerEngine`/`PartnerAgent`, ownership verificat server-side. Dar
+`apps/workbench/index.html` nu conține niciun cod Partner — verificat
+explicit prin căutare (`grep -n "Partner"`), zero rezultate înainte de
+această decizie. Liderul nu poate azi să creeze un partener, să
+solicite un diagnostic, sau să vadă scoruri, din Workbench.
+
+Decizia 37A (închisă, CI verde, 416/416) a expus `partner_id` în
+`GET /api/v1/contacts`, eliminând blocajul care ar fi împiedicat acest
+contract.
+
+## 2. Scope
+
+**Domeniu:** exclusiv `apps/workbench/index.html` (HTML/CSS/JS,
+fișier unic, fără build step) + `tests/test_workbench_structure.py`.
+
+**Explicit exclus — niciun cod backend nu se modifică:**
+- `PartnerEngine`, `PartnerAgent`, `src/api/routers/partners.py`
+- `src/api/schemas.py` (Partner*)
+- Niciun endpoint nou, nicio schimbare de payload/response față de
+  contractul deja implementat (16-partner-api-contract.md,
+  32-partner-create-contract.md)
+
+## 3. Sursă de adevăr pentru `partner_id` (regulă centrală)
+
+`currentPartnerId` **nu e o sursă independentă persistentă**. Pentru
+un contact deja convertit, sursa de adevăr este exclusiv
+`contact.partner_id`, citit din `GET /api/v1/contacts` (Decizia 37A).
+
+O variabilă runtime (`currentPartnerId`) există doar ca stare
+tranzitorie de execuție curentă — populată fie din
+`contact.partner_id` (contact deja convertit), fie din
+`response.id` după `POST /partners` (creare nouă în aceeași sesiune).
+Nu se citește din `localStorage`/`sessionStorage`/cookie — identic cu
+regula deja aplicată la `currentContactId`/`currentConversationId`
+(test existent: `test_nu_foloseste_local_storage`).
+
+## 4. Flux condiționat pe `converted_to`
+
+```
+selectContact(contactId)
+      │
+      ├── (deja există, neschimbat) POST /conversations
+      │
+      └── NOU: citește converted_to + partner_id din obiectul
+          contact deja primit de la loadContacts()
+              │
+              ├── converted_to !== "partner"
+              │       → afișează zona „Creează partener”
+              │       → ascunde Diagnostic/Send/Scores
+              │
+              └── converted_to === "partner"
+                      → currentPartnerId = contact.partner_id
+                      → ascunde „Creează partener”
+                      → afișează Diagnostic/Send/Scores
+```
+
+După `POST /partners` reușit: `currentPartnerId = response.id`,
+tranziție imediată către starea "partener creat" (Diagnostic/Send/
+Scores), fără reîncărcare de pagină și fără al doilea apel către
+`GET /contacts` doar pentru a re-obține `partner_id`-ul pe care
+răspunsul de creare îl oferă deja.
+
+## 5. Payload-uri exacte (identice cu backend-ul existent, nu se inventează câmpuri noi)
+
+```js
+// PARTNER_CREATE_PAYLOAD
+{ contact_id: currentContactId }
+
+// PARTNER_DIAGNOSTIC_PAYLOAD
+{ diagnostic_type: <una din cele 4> }
+
+// PARTNER_SEND_PAYLOAD
+{ confirmed: true }
+
+// GET /api/v1/partners/scores — fără body
+```
+
+**`diagnostic_type` — exact 4 valori fixe, hardcodate în UI ca
+listă**, identice cu `VALID_DIAGNOSTIC_TYPES` din
+`src/engines/partner/partner_engine.py`:
+`ENCOURAGEMENT`, `CLARITY`, `APPRECIATION`, `NEXT_STEP`.
+Nu se generează dinamic, nu există alt endpoint care le expune.
+
+## 6. Reguli de securitate și onestitate față de lider (fixate de contract)
+
+- **`owner_id` nu apare niciodată** în niciun payload trimis de
+  Workbench — identic cu regula deja aplicată și testată
+  (`test_owner_id_nu_apare_niciunde_in_fisier`). Identitatea vine
+  exclusiv din headerul `Authorization: Bearer <token>`.
+- Zona Partner e complet **inactivă/ascunsă** fără `currentContactId`
+  selectat — nicio acțiune Partner nu e posibilă înaintea selectării
+  unui contact (guard identic cu cel de la FollowUp,
+  `test_are_guard_pentru_contact_si_conversation_la_creare_followup`).
+- **Mesajul returnat de `/diagnostic` conține `[STUB]`** — Workbench-ul
+  îl afișează ca atare, cuvânt cu cuvânt, plus o notă vizibilă lângă
+  el (ex: "Mesaj generat automat — text fix, nu e generat de AI încă").
+  Nu se ascunde, nu se reformulează pentru a părea un mesaj final.
+- **Scorurile din `GET /partners/scores` sunt agregate pe owner, nu
+  pe partenerul selectat** (limitare confirmată din cod,
+  `PartnerAgent.get_recent_scores`, JOIN pe `owner_id` +
+  `ORDER BY calculated_at DESC` + cel mai recent per metrică). UI-ul
+  afișează explicit eticheta **"Scorurile tale cele mai recente"**,
+  niciodată "Scorul lui {nume partener}" — ar induce în eroare
+  liderul, dat fiind că API-ul nu poate azi filtra per-partener.
+
+## 7. Coduri de eroare de gestionat explicit în UI (din teste HTTP existente)
+
+| Acțiune | Cod | error_code | Mesaj UI |
+|---|---|---|---|
+| Create | 409 | `ALREADY_EXISTS` | Contactul e deja convertit — reîncarcă lista |
+| Create/Diagnostic/Send | 403 | `ACCESS_DENIED` | Sesiune invalidă pentru acest partener |
+| Diagnostic | 409 | `ALREADY_EXISTS` | Diagnostic deja generat azi pentru acest partener |
+| Send | 400 | `CONFIRMATION_REQUIRED` | Bifează confirmarea înainte de trimitere |
+
+Identic cu tiparul deja folosit la Objection (`renderConfirmResult`,
+banner `error`/`block`/`info`) — reutilizăm `apiFetch()` existent,
+care deja aruncă `Error` cu `.status`/`.errorCode` populate.
+
+## 8. Criterii de acceptare (RED — teste structurale în `test_workbench_structure.py`)
+
+Urmând exact convenția testelor existente (căutare de string/regex pe
+conținutul HTML, nu execuție de browser):
+
+1. `test_contine_endpoint_post_partners` — `"/api/v1/partners"` prezent ca string literal
+2. `test_contine_endpoint_partner_diagnostic` — pattern pentru `/partners/${...}/diagnostic`
+3. `test_contine_endpoint_partner_send` — pattern pentru `/partners/${...}/send`
+4. `test_contine_endpoint_partner_scores` — `"/api/v1/partners/scores"` prezent
+5. `test_partner_create_payload_contine_doar_contact_id` — payload-ul de creare conține exact `contact_id`, nimic altceva
+6. `test_diagnostic_payload_contine_doar_diagnostic_type`
+7. `test_send_payload_contine_doar_confirmed`
+8. `test_cele_patru_diagnostic_types_prezente` — toate 4 valorile exacte (`ENCOURAGEMENT`, `CLARITY`, `APPRECIATION`, `NEXT_STEP`) apar ca string-uri în fișier
+9. `test_partner_id_nu_e_citit_din_local_storage` — extensie a testului deja existent de `localStorage`, aplicat explicit și zonei noi
+10. `test_owner_id_nu_apare_niciunde_in_fisier` — testul existent rămâne valabil, verificat că trece și după adăugarea codului Partner (regresie, nu test nou)
+11. `test_zona_partner_ascunsa_fara_contact_selectat` — panoul Partner are clasa `disabled` implicit în markup, identic cu `panel-analyze`/`panel-followup`
+12. `test_mesaj_stub_afisat_ca_atare` — textul `[STUB]` sau echivalentul apare tratat explicit în cod (nu filtrat/ascuns printr-un `.replace()`)
+13. `test_eticheta_scoruri_nu_mentioneaza_partener_specific` — stringul folosit pentru afișarea scorurilor conține „cele mai recente" sau echivalent, nu „scorul acestui partener"
+
+## 9. Ordinea de lucru (identică cu 37A)
+
+```
+contract (acest document)
+   ↓
+RED — teste structurale, toate eșuând din lipsă de cod
+   ↓
+GREEN — cod minim în index.html care satisface exact aceste teste
+   ↓
+regresie completă (416 + N teste noi, toate PASS)
+   ↓
+37 CLOSED
+```
+
+Nu se scrie cod UI înainte de RED.
