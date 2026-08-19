@@ -17,6 +17,7 @@ from src.agents.conversation.conversation_agent import ConversationAgent
 from src.engines.contact.contact_engine import ContactEngine
 from src.agents.contact.contact_agent import ContactAgent
 from src.engines.conversation.conversation_engine import ConversationEngine
+from src.engines.priority.priority_engine import PriorityEngine
 
 
 def get_mission_agent() -> MissionAgent:
@@ -81,3 +82,8 @@ def get_contact_engine() -> ContactEngine:
 def get_contact_agent() -> ContactAgent:
     """Decizia 33, `33-conversation-objection-linkage-contract.md` — expune ContactAgent, deja existent."""
     return ContactAgent()
+
+
+def get_priority_engine() -> PriorityEngine:
+    """Decizia 39, `39-priority-api-contract.md` — PriorityEngine nu are dependințe proprii."""
+    return PriorityEngine()
