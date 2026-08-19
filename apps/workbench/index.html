@@ -266,10 +266,29 @@
     </div>
 
     <div class="status-line" id="mission-status-message"></div>
+  </section>
 
-    <div style="margin-top:16px;">
-      <button class="secondary" onclick="loadDisScore()">Vezi DIS-ul tău cel mai recent</button>
-      <div class="status-line" id="mission-dis-box"></div>
+  <!-- ZONA PERFORMANCE — Decizia 45, DIS Misiuni + DIS Follow-up-uri
+       alaturate, ca liderul sa inteleaga imediat ca sunt doua surse
+       ale aceluiasi KPI, nu doi KPI diferiti. Backend, formula si
+       producer-ul raman neatinse — doar conecteaza endpoint-uri deja
+       existente si testate. -->
+  <section class="panel disabled" id="panel-performance">
+    <h2><span class="step-no">•</span> Performance</h2>
+
+    <div class="row">
+      <div>
+        <p class="status-line" style="font-weight:600;">DIS — Misiuni</p>
+        <p class="status-line">Valoare operațională curentă</p>
+        <button class="secondary" onclick="loadDisScore()">Vezi DIS-ul tău cel mai recent</button>
+        <div class="status-line" id="mission-dis-box"></div>
+      </div>
+      <div>
+        <p class="status-line" style="font-weight:600;">DIS — Follow-up-uri</p>
+        <p class="status-line">Valoare operațională curentă</p>
+        <button class="secondary" onclick="loadFollowupDisScore()">Vezi DIS-ul tău cel mai recent (follow-up-uri)</button>
+        <div class="status-line" id="followup-dis-box"></div>
+      </div>
     </div>
   </section>
 
@@ -450,6 +469,7 @@
       setPanelEnabled("panel-followup", false);
       setPanelEnabled("panel-partner", false);
       setPanelEnabled("panel-mission", false);
+      setPanelEnabled("panel-performance", false);
       setPanelEnabled("panel-priority", false);
       throw new Error("Sesiunea a expirat sau tokenul e invalid — autentifică-te din nou.");
     }
@@ -516,6 +536,7 @@
       statusEl.textContent = "";
       setPanelEnabled("panel-contact", true);
       setPanelEnabled("panel-mission", true);
+      setPanelEnabled("panel-performance", true);
       setPanelEnabled("panel-priority", true);
       await loadContacts();
       await loadPriority();
@@ -1260,6 +1281,25 @@
       const result = await apiFetch("/api/v1/missions/dis-score", { method: "GET" });
       const dis = result.dis_score === null || result.dis_score === undefined ? "-" : result.dis_score;
       boxEl.textContent = "DIS-ul tău cel mai recent: " + dis;
+    } catch (e) {
+      boxEl.textContent = e.message;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // GET /api/v1/followups/dis-score — Decizia 45. A doua sursa a
+  // aceluiasi KPI DIS, corect izolata prin entity_type='followup' —
+  // separata explicit de DIS Mission ca liderul sa inteleaga imediat
+  // ca vede doua surse, nu doi KPI diferiti. Backend, formula (1.0
+  // placeholder) si producer-ul (FollowUpEngine) raman complet
+  // neatinse — doar conecteaza un endpoint deja existent si testat.
+  // ------------------------------------------------------------------
+  async function loadFollowupDisScore() {
+    const boxEl = document.getElementById("followup-dis-box");
+    try {
+      const result = await apiFetch("/api/v1/followups/dis-score", { method: "GET" });
+      const dis = result.dis_score === null || result.dis_score === undefined ? "-" : result.dis_score;
+      boxEl.textContent = "DIS-ul tău cel mai recent (follow-up-uri): " + dis;
     } catch (e) {
       boxEl.textContent = e.message;
     }
