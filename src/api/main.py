@@ -7,13 +7,13 @@ API), conform ordinii stabilite. FollowUp și Partner urmează separat.
 
 from fastapi import FastAPI
 
-from src.api.routers import missions, followups, partners, auth, objections, contacts, conversations
+from src.api.routers import missions, followups, partners, auth, objections, contacts, conversations, priority
 from src.api.exception_handlers import register_exception_handlers
 
 app = FastAPI(
     title="NicMar OS API",
     version="0.1.0",
-    description="API pentru NicMar OS — v1, Mission + FollowUp + Partner + Objections + Contacts + Conversations + Auth.",
+    description="API pentru NicMar OS — v1, Mission + FollowUp + Partner + Objections + Contacts + Conversations + Priority + Auth.",
 )
 
 register_exception_handlers(app)
@@ -24,6 +24,7 @@ app.include_router(partners.router)
 app.include_router(objections.router)
 app.include_router(contacts.router)
 app.include_router(conversations.router)
+app.include_router(priority.router)
 
 
 @app.get("/health")
