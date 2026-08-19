@@ -674,3 +674,101 @@ def test_eticheta_dis_nu_mentioneaza_misiunea_curenta(workbench_content):
         "Eticheta DIS trebuie sa foloseasca formularea exacta "
         "'DIS-ul tău cel mai recent' (contract 38, sectiunea 7)."
     )
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 40 (RED, 19 august 2026) — Priority Workbench.
+# Sursa: 40-workbench-priority-contract.md, sectiunea 6.
+#
+# Panou de citire/executie a prioritatii — FARA actiuni noi, FARA
+# marcaje de payload (GET fara body, nimic de restrictionat strict).
+# Construit exclusiv peste GET /api/v1/priority, deja castigat si
+# testat complet la Decizia 39 (447/447 PASSED).
+# ----------------------------------------------------------------------
+
+
+def test_contine_endpoint_get_priority(workbench_content):
+    """Contract 40, sectiunea 6, criteriul 1."""
+    assert "/api/v1/priority" in workbench_content
+
+
+def _extract_apifetch_call_options_any_quote(content: str, url: str) -> str:
+    """
+    Varianta a helper-ului de extragere apiFetch(...) care accepta orice
+    tip de delimitator (backtick sau ghilimele) — /api/v1/priority nu are
+    parametri dinamici, deci nu are nevoie de template literal cu backtick.
+    """
+    pattern = r"apiFetch\(\s*[`'\"]" + re.escape(url) + r"[`'\"]\s*,\s*\{(.*?)\}\s*\)"
+    match = re.search(pattern, content, re.DOTALL)
+    assert match is not None, (
+        f"Apelul apiFetch pentru '{url}' nu a fost gasit in forma asteptata "
+        f"apiFetch(\"{url}\", {{ ... }})."
+    )
+    return match.group(1)
+
+
+def test_priority_foloseste_method_get(workbench_content):
+    """
+    Contract 40, criteriul 2: apelul catre /api/v1/priority trebuie sa
+    foloseasca explicit method: "GET" — verificat prin extragerea
+    optiunilor efective din apel, nu doar prezenta URL-ului ca text.
+    """
+    options_block = _extract_apifetch_call_options_any_quote(workbench_content, "/api/v1/priority")
+    assert re.search(r'method\s*:\s*["\']GET["\']', options_block), (
+        'Apelul catre /api/v1/priority trebuie sa foloseasca explicit method: "GET".'
+    )
+
+
+def test_zona_priority_activa_dupa_login(workbench_content):
+    """
+    Contract 40, sectiunea 3 + criteriul 3: panoul Priority exista cu
+    id="panel-priority" si este activat direct in login(), la fel ca
+    panel-mission (Decizia 38) — independent de currentContactId.
+    """
+    assert re.search(r'class="panel disabled"\s+id="panel-priority"', workbench_content), (
+        'Panoul Priority trebuie sa existe cu id="panel-priority" si clasa '
+        '"disabled" implicit in markup.'
+    )
+
+    login_match = re.search(r"async function login\(\)(.*?)\n  \}", workbench_content, re.DOTALL)
+    assert login_match is not None, "Functia login() nu a fost gasita in forma asteptata."
+    assert 'setPanelEnabled("panel-priority", true)' in login_match.group(1), (
+        "panel-priority trebuie activat direct in login(), nu conditionat de "
+        "selectContact() (contract 40, sectiunea 3)."
+    )
+
+
+def test_afiseaza_campurile_activitate(workbench_content):
+    """
+    Contract 40, criteriul 4: codul trebuie sa citeasca explicit cele 5
+    campuri publice ale unei activitati (proprietati citite, nu doar
+    text decorativ undeva in fisier).
+    """
+    for field in ("entity_type", "title", "impact", "urgency", "vechime_seconds"):
+        assert "." + field in workbench_content, (
+            f"Campul '{field}' trebuie citit explicit ca proprietate "
+            f"(ex. activity.{field}), nu doar mentionat ca text."
+        )
+
+
+def test_entity_id_pastrat_ca_atribut(workbench_content):
+    """Contract 40, criteriul 5."""
+    assert "data-entity-id" in workbench_content
+
+
+def test_mesaj_lista_goala_exact(workbench_content):
+    """Contract 40, criteriul 6 — text exact, nu o formulare aproximativa."""
+    assert "Nu ai activități prioritare acum." in workbench_content
+
+
+def test_fara_subresurse_priority(workbench_content):
+    """
+    Contract 40, criteriul 7: garda impotriva scope creep — nicio
+    actiune noua nu trebuie adaugata sub /api/v1/priority/... (panoul
+    Priority ramane strict de citire, conform deciziei aprobate).
+    """
+    assert not re.search(r"/api/v1/priority/", workbench_content), (
+        "Nu trebuie sa existe niciun apel catre o sub-resursa de tip "
+        "/api/v1/priority/... — panoul Priority e strict read-only "
+        "(contract 40, sectiunea 2)."
+    )
