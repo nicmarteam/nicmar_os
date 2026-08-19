@@ -228,3 +228,4 @@ class ContactSummaryResponse(BaseModel):
     pdi: Optional[float]
     pip: Optional[float]
     reason: str
+    partner_id: Optional[UUID]
