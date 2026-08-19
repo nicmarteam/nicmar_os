@@ -228,6 +228,51 @@
     </div>
   </section>
 
+  <!-- ZONA MISSION — Decizia 38, activa dupa login, independenta de contact -->
+  <section class="panel disabled" id="panel-mission">
+    <h2><span class="step-no">•</span> Misiunea de azi</h2>
+
+    <div id="mission-none-box">
+      <label for="mission-title-input">Titlu misiune</label>
+      <input type="text" id="mission-title-input" placeholder="ex: Sună 3 contacte noi">
+      <button id="create-mission-btn" onclick="createMission()" style="margin-top:8px;">Generează misiune</button>
+    </div>
+
+    <div id="mission-active-box" class="hidden">
+      <p class="status-line">Titlu: <strong id="mission-title-label"></strong></p>
+      <p class="status-line">Stare: <strong id="mission-status-label"></strong></p>
+
+      <div id="mission-present-box" style="margin-top:10px;">
+        <button class="secondary" onclick="presentMission()">Prezintă</button>
+        <div class="status-line" id="mission-present-text"></div>
+      </div>
+
+      <div id="mission-assign-box" class="hidden" style="margin-top:10px;">
+        <button onclick="assignMission()">Assign</button>
+      </div>
+
+      <div id="mission-start-box" class="hidden" style="margin-top:10px;">
+        <label><input type="checkbox" id="mission-start-confirm-checkbox"> Sunt gata, încep</label>
+        <button onclick="startMission()" style="margin-top:8px;">Start</button>
+      </div>
+
+      <div id="mission-complete-box" class="hidden" style="margin-top:10px;">
+        <button onclick="completeMission()">Complete</button>
+      </div>
+
+      <div id="mission-completed-box" class="hidden" style="margin-top:10px;">
+        <div class="banner pass">✅ Misiune finalizată.</div>
+      </div>
+    </div>
+
+    <div class="status-line" id="mission-status-message"></div>
+
+    <div style="margin-top:16px;">
+      <button class="secondary" onclick="loadDisScore()">Vezi DIS-ul tău cel mai recent</button>
+      <div class="status-line" id="mission-dis-box"></div>
+    </div>
+  </section>
+
   <!-- ZONA CONTACT & CONVERSATIE — Decizia 34, sectiunea 2.1 -->
   <section class="panel disabled" id="panel-contact">
     <h2><span class="step-no">•</span> Contact și conversație</h2>
@@ -396,6 +441,7 @@
       setPanelEnabled("panel-confirm", false);
       setPanelEnabled("panel-followup", false);
       setPanelEnabled("panel-partner", false);
+      setPanelEnabled("panel-mission", false);
       throw new Error("Sesiunea a expirat sau tokenul e invalid — autentifică-te din nou.");
     }
 
@@ -460,6 +506,7 @@
       document.getElementById("login-success").classList.remove("hidden");
       statusEl.textContent = "";
       setPanelEnabled("panel-contact", true);
+      setPanelEnabled("panel-mission", true);
       await loadContacts();
     } catch (e) {
       passwordInput.value = "";
@@ -1023,6 +1070,187 @@
         '<div class="banner info">ℹ️ Trimis — recomandăm verificare suplimentară: ' +
         escapeHtml(result.reason || "") + "</div>";
       confirmBtn.disabled = true;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // ZONA MISSION — Decizia 38
+  //
+  // Independenta de currentContactId (verificat din audit: contact_id/
+  // partner_id din missions nu sunt folosite nicaieri in engine/agent).
+  // Nu exista endpoint GET pentru "misiunea de azi" — starea Mission e
+  // cunoscuta doar in cadrul sesiunii curente (dupa create/assign/start/
+  // complete), identic cu limitarea deja acceptata pentru alte zone
+  // fara persistenta in aceasta versiune a Workbench-ului.
+  // ------------------------------------------------------------------
+  let currentMissionId = null;
+  let currentMissionStatus = null;
+
+  function renderMissionState(mission) {
+    const noneBox = document.getElementById("mission-none-box");
+    const activeBox = document.getElementById("mission-active-box");
+    const assignBox = document.getElementById("mission-assign-box");
+    const startBox = document.getElementById("mission-start-box");
+    const completeBox = document.getElementById("mission-complete-box");
+    const completedBox = document.getElementById("mission-completed-box");
+
+    if (!mission) {
+      currentMissionId = null;
+      currentMissionStatus = null;
+      noneBox.classList.remove("hidden");
+      activeBox.classList.add("hidden");
+      return;
+    }
+
+    currentMissionId = mission.id;
+    currentMissionStatus = mission.status;
+    noneBox.classList.add("hidden");
+    activeBox.classList.remove("hidden");
+    document.getElementById("mission-title-label").textContent = mission.title;
+    document.getElementById("mission-status-label").textContent = mission.status;
+
+    assignBox.classList.add("hidden");
+    startBox.classList.add("hidden");
+    completeBox.classList.add("hidden");
+    completedBox.classList.add("hidden");
+
+    if (mission.status === "GENERATED") {
+      assignBox.classList.remove("hidden");
+    } else if (mission.status === "ASSIGNED") {
+      startBox.classList.remove("hidden");
+    } else if (mission.status === "IN_PROGRESS") {
+      completeBox.classList.remove("hidden");
+    } else if (mission.status === "COMPLETED") {
+      completedBox.classList.remove("hidden");
+    }
+  }
+
+  async function createMission() {
+    const statusEl = document.getElementById("mission-status-message");
+    const titleInput = document.getElementById("mission-title-input");
+    const title = titleInput.value.trim();
+
+    if (!title) {
+      statusEl.textContent = "Introdu titlul misiunii.";
+      return;
+    }
+
+    // MISSION_CREATE_PAYLOAD_START
+    const missionCreatePayload = {
+      title: title,
+    };
+    // MISSION_CREATE_PAYLOAD_END
+
+    statusEl.textContent = "Se generează misiunea...";
+
+    try {
+      const mission = await apiFetch("/api/v1/missions", {
+        method: "POST",
+        body: JSON.stringify(missionCreatePayload),
+      });
+      titleInput.value = "";
+      statusEl.textContent = "";
+      renderMissionState(mission);
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function assignMission() {
+    const statusEl = document.getElementById("mission-status-message");
+    if (!currentMissionId) {
+      statusEl.textContent = "Nu există o misiune activă.";
+      return;
+    }
+    try {
+      const mission = await apiFetch(`/api/v1/missions/${currentMissionId}/assign`, {
+        method: "POST",
+      });
+      statusEl.textContent = "";
+      renderMissionState(mission);
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function presentMission() {
+    const textEl = document.getElementById("mission-present-text");
+    if (!currentMissionId) {
+      textEl.textContent = "Nu există o misiune activă.";
+      return;
+    }
+    try {
+      const result = await apiFetch(`/api/v1/missions/${currentMissionId}/present`, {
+        method: "GET",
+      });
+      textEl.textContent = result.text;
+    } catch (e) {
+      textEl.textContent = e.message;
+    }
+  }
+
+  async function startMission() {
+    const statusEl = document.getElementById("mission-status-message");
+    const confirmCheckbox = document.getElementById("mission-start-confirm-checkbox");
+
+    if (!currentMissionId) {
+      statusEl.textContent = "Nu există o misiune activă.";
+      return;
+    }
+    if (!confirmCheckbox.checked) {
+      statusEl.textContent = "Bifează confirmarea înainte de a începe.";
+      return;
+    }
+
+    // MISSION_START_PAYLOAD_START
+    const missionStartPayload = {
+      confirmed: true,
+    };
+    // MISSION_START_PAYLOAD_END
+
+    try {
+      const mission = await apiFetch(`/api/v1/missions/${currentMissionId}/start`, {
+        method: "POST",
+        body: JSON.stringify(missionStartPayload),
+      });
+      statusEl.textContent = "";
+      renderMissionState(mission);
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function completeMission() {
+    const statusEl = document.getElementById("mission-status-message");
+    if (!currentMissionId) {
+      statusEl.textContent = "Nu există o misiune activă.";
+      return;
+    }
+    try {
+      const mission = await apiFetch(`/api/v1/missions/${currentMissionId}/complete`, {
+        method: "POST",
+      });
+      statusEl.textContent = "";
+      renderMissionState(mission);
+      await loadDisScore();
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // GET /api/v1/missions/dis-score — agregat pe owner (cel mai recent
+  // DIS din toate misiunile), NU pe misiunea curenta. Eticheta reflecta
+  // explicit aceasta limitare (contract 38, sectiunea 7).
+  // ------------------------------------------------------------------
+  async function loadDisScore() {
+    const boxEl = document.getElementById("mission-dis-box");
+    try {
+      const result = await apiFetch("/api/v1/missions/dis-score", { method: "GET" });
+      const dis = result.dis_score === null || result.dis_score === undefined ? "-" : result.dis_score;
+      boxEl.textContent = "DIS-ul tău cel mai recent: " + dis;
+    } catch (e) {
+      boxEl.textContent = e.message;
     }
   }
 
