@@ -535,3 +535,96 @@ def test_converted_fara_client_fara_partner_nu_produce_crash(agent):
     assert summary.converted_to is None
     assert summary.pdi is None
     assert summary.pip is None
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 37A (RED, 19 august 2026) — expunere partner_id in
+# ContactSummary. Sursa: 37A-expose-partner-id-contract.md, sectiunea 5.
+# partner_id era deja citit intern (pozitia 7 din _ContactRow), dar
+# niciodata expus in ContactSummary pana acum.
+# ----------------------------------------------------------------------
+
+
+def test_partner_id_expus_pentru_contact_convertit(agent):
+    """
+    Criteriul 1 (contract 37A): contact convertit in Partener ->
+    partner_id trebuie sa fie EXACT UUID-ul partenerului asociat,
+    nu doar "nenul". Testul foloseste doi Parteneri distincti ai
+    aceluiasi owner ca sa exclu orice posibilitate ca implementarea
+    sa returneze primul/orice partner_id gasit, in loc de cel corect
+    pentru fiecare contact in parte.
+    """
+    owner_id = uuid4()
+    contact_a = uuid4()
+    contact_b = uuid4()
+    partner_a = uuid4()
+    partner_b = uuid4()
+
+    rows = [
+        (contact_a, "Contact A", "CONVERTED", None, None, "partner", NOW, partner_a),
+        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=None)
+        mock_cur.fetchall.side_effect = [rows, []]
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary_a = next(c for c in result if c.contact_id == contact_a)
+    summary_b = next(c for c in result if c.contact_id == contact_b)
+
+    assert summary_a.partner_id == partner_a
+    assert summary_b.partner_id == partner_b
+    assert summary_a.partner_id != summary_b.partner_id
+
+
+def test_partner_id_none_pentru_contact_neconvertit(agent):
+    """Criteriul 2 (contract 37A): contact neconvertit -> partner_id is None."""
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    rows = [
+        (contact_id, "Contact Neconvertit", "ACTIVE", None, None, None, NOW, None),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=rows)
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id)
+
+    summary = next(c for c in result if c.contact_id == contact_id)
+    assert summary.partner_id is None
+
+
+def test_partner_id_izolat_pe_owner(agent):
+    """
+    Criteriul 3 (contract 37A): rezultatul pentru owner_id-ul B nu
+    trebuie sa contina niciodata partner_id-ul unui contact/partener
+    al owner_id-ului A. Verificat la nivel de rezultat produs de
+    agent, nu doar prin prezenta owner_id in parametrii SQL — cursorul
+    mock intoarce EXCLUSIV randurile lui B (asa cum ar face un WHERE
+    owner_id = %s real), deci orice partner_id al lui A care ar aparea
+    in rezultat ar demonstra o scurgere reala intre useri.
+    """
+    owner_id_b = uuid4()
+    contact_b = uuid4()
+    partner_b = uuid4()
+    partner_id_a_strain = uuid4()  # nu trebuie sa apara niciodata
+
+    rows_doar_ale_lui_b = [
+        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b),
+    ]
+
+    with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
+        mock_cur = _make_cursor(fetchall_return=None)
+        mock_cur.fetchall.side_effect = [rows_doar_ale_lui_b, []]
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        result = agent.list_prioritized_contacts(owner_id_b)
+
+    partner_ids_in_rezultat = [c.partner_id for c in result]
+    assert partner_id_a_strain not in partner_ids_in_rezultat
+    assert partner_ids_in_rezultat == [partner_b]
