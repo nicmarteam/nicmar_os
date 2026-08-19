@@ -127,3 +127,35 @@ def test_create_contact_owner_id_folosit_exact_cel_transmis(engine):
 
         executed_params = mock_cur.execute.call_args[0][1]
         assert owner_id in executed_params
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 42 (RED, 19 august 2026) — ContactCreated event.
+# Sursa: 42-contact-events-contract.md, sectiunea 4, criteriul 1.
+# Pattern identic cu test_creare_noua_emite_event_conversation_created
+# (tests/test_conversation_engine.py).
+# ----------------------------------------------------------------------
+
+
+def test_create_contact_emite_event_contact_created(engine):
+    """
+    Contract 42, criteriul 1: create_contact() trebuie sa emita
+    evenimentul ContactCreated, cu target_object_id = contact.id,
+    dupa ce INSERT-ul a reusit.
+    """
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
+         patch.object(ContactEngine, "_emit_event") as mock_emit:
+        mock_cur = _make_cursor(
+            (contact_id, owner_id, "Test Event", None, None, "NEW", None, {}),
+        )
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.create_contact(owner_id=owner_id, full_name="Test Event")
+
+        mock_emit.assert_called_once()
+        args = mock_emit.call_args[0]
+        assert args[0] == "ContactCreated"
+        assert args[1] == contact_id
