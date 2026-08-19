@@ -801,6 +801,96 @@ class TestObjectionEngineOnRealPostgres:
                 )
                 assert cur.fetchone()[0] == 2
 
+    # ------------------------------------------------------------------
+    # DECIZIA 43 (RED, 19 august 2026) — evenimente, pe PostgreSQL real.
+    # Sursa: 43-objection-events-contract.md, sectiunea 5, criteriile 4-6.
+    # ------------------------------------------------------------------
+
+    def test_evenimentul_objection_created_e_scris_in_events(self):
+        """Contract 43, criteriul 4."""
+        owner_id = _create_user("objection-event-created")
+        engine = ObjectionEngine()
+
+        objection = engine.create_objection(
+            owner_id=owner_id, objection_text="e scump", objection_category="PRET",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT event_name, target_object FROM events WHERE target_object_id = %s",
+                    (objection.id,),
+                )
+                row = cur.fetchone()
+        assert row == ("ObjectionCreated", "objection")
+
+    def test_evenimentul_submit_response_pass_e_scris_in_events(self):
+        """Contract 43, criteriul 5."""
+        owner_id = _create_user("objection-event-pass")
+        objection_id = self._create_objection(owner_id, "PRET", "Mi se pare cam scump.")
+        engine = ObjectionEngine()
+
+        engine.submit_response(
+            objection_id=objection_id,
+            owner_id=owner_id,
+            objection_category="PRET",
+            objection_text="Mi se pare cam scump.",
+            response_text="Înțeleg, chiar poate părea o investiție.",
+            response_variant_used="CALDA",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT event_name, target_object, payload FROM events "
+                    "WHERE target_object_id = %s AND event_name = 'ObjectionResponseSubmitted'",
+                    (objection_id,),
+                )
+                row = cur.fetchone()
+        assert row is not None
+        assert row[0] == "ObjectionResponseSubmitted"
+        assert row[1] == "objection"
+        assert row[2]["persisted"] is True
+        assert row[2]["validation_level"] == "PASS"
+
+    def test_evenimentul_submit_response_block_e_scris_in_events(self):
+        """
+        Contract 43, criteriul 6: evenimentul se scrie SI pe BLOCK, dar
+        objections.response_text ramane NULL — regresie explicita pe
+        regula deja validata (evenimentul nu schimba comportamentul de
+        persistare).
+        """
+        owner_id = _create_user("objection-event-block")
+        objection_id = self._create_objection(owner_id, "PRET", "e scump")
+        engine = ObjectionEngine()
+
+        engine.submit_response(
+            objection_id=objection_id,
+            owner_id=owner_id,
+            objection_category="PRET",
+            objection_text="e scump",
+            response_text="Îți garantez că vei câștiga bani.",
+            response_variant_used="CALDA",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT event_name, target_object, payload FROM events "
+                    "WHERE target_object_id = %s AND event_name = 'ObjectionResponseSubmitted'",
+                    (objection_id,),
+                )
+                event_row = cur.fetchone()
+                cur.execute(
+                    "SELECT response_text FROM objections WHERE id = %s", (objection_id,),
+                )
+                objection_row = cur.fetchone()
+
+        assert event_row is not None
+        assert event_row[2]["persisted"] is False
+        assert event_row[2]["validation_level"] == "BLOCK"
+        assert objection_row[0] is None
+
 
 class TestConversationAgentOnRealPostgres:
     """
