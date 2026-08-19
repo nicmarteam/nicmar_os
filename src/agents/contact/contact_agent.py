@@ -80,6 +80,12 @@ class ContactSummary:
             Contactul în această poziție — derivat exclusiv din grupul
             de prioritate deja calculat, nu recalculează nimic
             (v. contract secțiunea 5.1).
+        partner_id: Identificatorul Partenerului asociat, populat doar
+            când converted_to == "partner" — aceeași valoare deja
+            citită intern pentru maparea PDI/PIP (v. secțiunea 3.1),
+            acum expusă public (37A-expose-partner-id-contract.md,
+            secțiunea 4). None dacă Contactul nu e convertit în
+            Partener.
     """
 
     contact_id: UUID
@@ -91,6 +97,7 @@ class ContactSummary:
     pdi: Optional[float]
     pip: Optional[float]
     reason: str
+    partner_id: Optional[UUID]
 
 
 def _priority_group(
@@ -206,6 +213,7 @@ class ContactAgent:
                     pdi=partner_scores.get("PDI"),
                     pip=partner_scores.get("PIP"),
                     reason=_reason(last_followup_at, last_followup_status),
+                    partner_id=partner_id,
                 )
             )
         return result
