@@ -273,6 +273,14 @@
     </div>
   </section>
 
+  <!-- ZONA PRIORITY — Decizia 40, activa dupa login, independenta de contact -->
+  <section class="panel disabled" id="panel-priority">
+    <h2><span class="step-no">•</span> Planul zilei</h2>
+
+    <div id="priority-list"></div>
+    <div class="status-line" id="priority-status"></div>
+  </section>
+
   <!-- ZONA CONTACT & CONVERSATIE — Decizia 34, sectiunea 2.1 -->
   <section class="panel disabled" id="panel-contact">
     <h2><span class="step-no">•</span> Contact și conversație</h2>
@@ -442,6 +450,7 @@
       setPanelEnabled("panel-followup", false);
       setPanelEnabled("panel-partner", false);
       setPanelEnabled("panel-mission", false);
+      setPanelEnabled("panel-priority", false);
       throw new Error("Sesiunea a expirat sau tokenul e invalid — autentifică-te din nou.");
     }
 
@@ -507,7 +516,9 @@
       statusEl.textContent = "";
       setPanelEnabled("panel-contact", true);
       setPanelEnabled("panel-mission", true);
+      setPanelEnabled("panel-priority", true);
       await loadContacts();
+      await loadPriority();
     } catch (e) {
       passwordInput.value = "";
       statusEl.textContent = "Eroare de rețea la autentificare.";
@@ -1251,6 +1262,45 @@
       boxEl.textContent = "DIS-ul tău cel mai recent: " + dis;
     } catch (e) {
       boxEl.textContent = e.message;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // ZONA PRIORITY — Decizia 40
+  //
+  // Sursa unica de date: GET /api/v1/priority (Decizia 39), deja
+  // sortat si limitat la maximum 5 de PriorityEngine. Workbench-ul NU
+  // resorteaza, NU filtreaza — afiseaza exact ce primeste. Fara
+  // actiuni noi — panou strict de citire/executie a prioritatii,
+  // executia ramane in panourile Mission si FollowUp existente.
+  // ------------------------------------------------------------------
+  async function loadPriority() {
+    const listEl = document.getElementById("priority-list");
+    const statusEl = document.getElementById("priority-status");
+    try {
+      const activities = await apiFetch("/api/v1/priority", { method: "GET" });
+      listEl.innerHTML = "";
+
+      if (activities.length === 0) {
+        statusEl.textContent = "Nu ai activități prioritare acum.";
+        return;
+      }
+
+      statusEl.textContent = "";
+      activities.forEach(function (activity) {
+        const card = document.createElement("div");
+        card.className = "variant-card";
+        card.setAttribute("data-entity-id", activity.entity_id);
+        card.innerHTML =
+          "<div class=\"label\">" + escapeHtml(activity.entity_type) + "</div>" +
+          "<div class=\"text\">" + escapeHtml(activity.title) + "</div>" +
+          "<div class=\"status-line\">Impact: " + activity.impact +
+          " · Urgență: " + activity.urgency +
+          " · Vechime: " + Math.round(activity.vechime_seconds) + "s</div>";
+        listEl.appendChild(card);
+      });
+    } catch (e) {
+      statusEl.textContent = e.message;
     }
   }
 
