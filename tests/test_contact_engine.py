@@ -41,7 +41,8 @@ def test_create_contact_status_este_hardcodat_new_nu_din_parametru(engine):
     owner_id = uuid4()
     contact_id = uuid4()
 
-    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
+         patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
             (contact_id, owner_id, "Ion Popescu", None, None, "NEW", None, {}),
         )
@@ -100,7 +101,8 @@ def test_create_contact_metadata_none_devine_dict_gol(engine):
     owner_id = uuid4()
     contact_id = uuid4()
 
-    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
+         patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
             (contact_id, owner_id, "Test", None, None, "NEW", None, {}),
         )
@@ -117,7 +119,8 @@ def test_create_contact_owner_id_folosit_exact_cel_transmis(engine):
     owner_id = uuid4()
     contact_id = uuid4()
 
-    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn:
+    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
+         patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
             (contact_id, owner_id, "Test", None, None, "NEW", None, {}),
         )
