@@ -36,6 +36,7 @@ def list_contacts(
             contact_id=s.contact_id, full_name=s.full_name, status=s.status,
             last_followup_at=s.last_followup_at, last_followup_status=s.last_followup_status,
             converted_to=s.converted_to, pdi=s.pdi, pip=s.pip, reason=s.reason,
+            partner_id=s.partner_id,
         )
         for s in summaries
     ]
