@@ -82,7 +82,19 @@ class ContactEngine:
                 cur.execute(query, (owner_id, full_name, phone, email, source, Json(metadata or {})))
                 row = cur.fetchone()
 
-        return Contact(
+        contact = Contact(
             id=row[0], owner_id=row[1], full_name=row[2], phone=row[3],
             email=row[4], status=row[5], source=row[6], metadata=row[7],
         )
+        self._emit_event("ContactCreated", contact.id, {"owner_id": str(owner_id)})
+        return contact
+
+    def _emit_event(self, event_name: str, target_object_id: UUID, payload: dict) -> None:
+        """Scrie evenimentul în tabelul generic `events` (pattern identic cu celelalte 4 engine-uri)."""
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO events (event_name, target_object, target_object_id, payload) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (event_name, "contact", target_object_id, Json(payload)),
+                )
