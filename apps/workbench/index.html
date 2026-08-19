@@ -275,6 +275,46 @@
     </div>
   </section>
 
+  <!-- ZONA PARTNER — Decizia 37 -->
+  <section class="panel disabled" id="panel-partner">
+    <h2><span class="step-no">•</span> Partener</h2>
+
+    <div id="partner-create-box">
+      <p class="status-line">Acest contact nu este încă partener.</p>
+      <button id="create-partner-btn" onclick="createPartner()">Creează partener</button>
+    </div>
+
+    <div id="partner-actions-box" class="hidden">
+      <div style="margin-top:10px;">
+        <p class="status-line">Alege tipul de diagnostic:</p>
+        <div class="category-list" id="diagnostic-type-list">
+          <button class="category-btn" type="button" onclick="selectDiagnosticType('ENCOURAGEMENT', this)">ENCOURAGEMENT</button>
+          <button class="category-btn" type="button" onclick="selectDiagnosticType('CLARITY', this)">CLARITY</button>
+          <button class="category-btn" type="button" onclick="selectDiagnosticType('APPRECIATION', this)">APPRECIATION</button>
+          <button class="category-btn" type="button" onclick="selectDiagnosticType('NEXT_STEP', this)">NEXT_STEP</button>
+        </div>
+        <button id="request-diagnostic-btn" onclick="requestDiagnostic()">Solicită diagnostic</button>
+      </div>
+
+      <div id="diagnostic-result-box" class="hidden" style="margin-top:14px;">
+        <p class="status-line">Mesaj generat automat — text fix [STUB], nu e generat de AI încă:</p>
+        <div id="diagnostic-message" class="variant-card"></div>
+        <div style="margin-top:10px;">
+          <label><input type="checkbox" id="send-confirm-checkbox"> Confirm trimiterea mesajului</label>
+        </div>
+        <button id="send-partner-btn" onclick="sendPartnerMessage()" style="margin-top:8px;">Trimite</button>
+        <div id="send-result" style="margin-top:10px;"></div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <button class="secondary" onclick="loadPartnerScores()">Vezi scorurile tale cele mai recente</button>
+        <div class="status-line" id="partner-scores-box"></div>
+      </div>
+    </div>
+
+    <div class="status-line" id="partner-status"></div>
+  </section>
+
   <!-- FAZA 1 — ANALIZĂ — sectiunea 2.2 -->
   <section class="panel disabled" id="panel-analyze">
     <h2><span class="step-no">1</span> Analizează obiecția</h2>
@@ -326,6 +366,8 @@
   let currentObjectionId = null;
   let currentVariants = {};
   let chosenVariantKey = null;
+  let currentPartnerId = null;
+  let currentDiagnosticType = null;
 
   const API_BASE = "/api/v1"; // documentativ — fiecare endpoint e scris ca string literal complet mai jos
 
@@ -353,6 +395,7 @@
       setPanelEnabled("panel-prepare", false);
       setPanelEnabled("panel-confirm", false);
       setPanelEnabled("panel-followup", false);
+      setPanelEnabled("panel-partner", false);
       throw new Error("Sesiunea a expirat sau tokenul e invalid — autentifică-te din nou.");
     }
 
@@ -438,7 +481,7 @@
         btn.className = "category-btn";
         btn.type = "button";
         btn.textContent = contact.full_name + " (" + contact.status + ")";
-        btn.onclick = function () { selectContact(contact.contact_id, btn); };
+        btn.onclick = function () { selectContact(contact, btn); };
         listEl.appendChild(btn);
       });
     } catch (e) {
@@ -469,8 +512,9 @@
     }
   }
 
-  async function selectContact(contactId, btnEl) {
+  async function selectContact(contact, btnEl) {
     const statusEl = document.getElementById("contact-status");
+    const contactId = contact.contact_id;
     currentContactId = contactId;
     document.querySelectorAll("#contacts-list .category-btn").forEach(function (b) {
       b.classList.remove("selected");
@@ -490,8 +534,163 @@
       setPanelEnabled("panel-analyze", true);
       setPanelEnabled("panel-followup", true);
       await loadFollowUps();
+
+      setupPartnerZone(contact);
     } catch (e) {
       statusEl.textContent = e.message;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // ZONA PARTNER — Decizia 37
+  //
+  // Sursa de adevar pentru un contact deja convertit este exclusiv
+  // contact.partner_id, venit din GET /api/v1/contacts (Decizia 37A).
+  // currentPartnerId e doar stare runtime tranzitorie — populata fie
+  // de aici, fie din response.id dupa POST /partners; niciodata dintr-un
+  // mecanism de stocare persistent in browser.
+  // ------------------------------------------------------------------
+  function setupPartnerZone(contact) {
+    setPanelEnabled("panel-partner", true);
+    document.getElementById("partner-status").textContent = "";
+    document.getElementById("diagnostic-result-box").classList.add("hidden");
+    document.getElementById("partner-scores-box").textContent = "";
+    currentDiagnosticType = null;
+    document.querySelectorAll("#diagnostic-type-list .category-btn").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+
+    if (contact.converted_to === "partner") {
+      currentPartnerId = contact.partner_id;
+      document.getElementById("partner-create-box").classList.add("hidden");
+      document.getElementById("partner-actions-box").classList.remove("hidden");
+    } else {
+      currentPartnerId = null;
+      document.getElementById("partner-create-box").classList.remove("hidden");
+      document.getElementById("partner-actions-box").classList.add("hidden");
+    }
+  }
+
+  async function createPartner() {
+    const statusEl = document.getElementById("partner-status");
+
+    if (!currentContactId) {
+      statusEl.textContent = "Selectează mai întâi un contact.";
+      return;
+    }
+
+    // PARTNER_CREATE_PAYLOAD_START
+    const partnerCreatePayload = {
+      contact_id: currentContactId,
+    };
+    // PARTNER_CREATE_PAYLOAD_END
+
+    statusEl.textContent = "Se creează partenerul...";
+
+    try {
+      const partner = await apiFetch("/api/v1/partners", {
+        method: "POST",
+        body: JSON.stringify(partnerCreatePayload),
+      });
+      currentPartnerId = partner.id;
+      statusEl.textContent = "";
+      document.getElementById("partner-create-box").classList.add("hidden");
+      document.getElementById("partner-actions-box").classList.remove("hidden");
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  function selectDiagnosticType(diagnosticType, btnEl) {
+    currentDiagnosticType = diagnosticType;
+    document.querySelectorAll("#diagnostic-type-list .category-btn").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+    btnEl.classList.add("selected");
+  }
+
+  async function requestDiagnostic() {
+    const statusEl = document.getElementById("partner-status");
+
+    if (!currentPartnerId) {
+      statusEl.textContent = "Nu există un partener activ.";
+      return;
+    }
+    if (!currentDiagnosticType) {
+      statusEl.textContent = "Alege mai întâi un tip de diagnostic.";
+      return;
+    }
+
+    // PARTNER_DIAGNOSTIC_PAYLOAD_START
+    const partnerDiagnosticPayload = {
+      diagnostic_type: currentDiagnosticType,
+    };
+    // PARTNER_DIAGNOSTIC_PAYLOAD_END
+
+    statusEl.textContent = "Se generează diagnosticul...";
+
+    try {
+      const diagnostic = await apiFetch(`/api/v1/partners/${currentPartnerId}/diagnostic`, {
+        method: "POST",
+        body: JSON.stringify(partnerDiagnosticPayload),
+      });
+      statusEl.textContent = "";
+      document.getElementById("diagnostic-message").textContent = diagnostic.message;
+      document.getElementById("diagnostic-result-box").classList.remove("hidden");
+      document.getElementById("send-confirm-checkbox").checked = false;
+      document.getElementById("send-result").innerHTML = "";
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function sendPartnerMessage() {
+    const statusEl = document.getElementById("partner-status");
+    const resultEl = document.getElementById("send-result");
+    const confirmCheckbox = document.getElementById("send-confirm-checkbox");
+
+    if (!currentPartnerId) {
+      statusEl.textContent = "Nu există un partener activ.";
+      return;
+    }
+    if (!confirmCheckbox.checked) {
+      resultEl.innerHTML = '<div class="banner error">Bifează confirmarea înainte de trimitere.</div>';
+      return;
+    }
+
+    // PARTNER_SEND_PAYLOAD_START
+    const partnerSendPayload = {
+      confirmed: true,
+    };
+    // PARTNER_SEND_PAYLOAD_END
+
+    try {
+      await apiFetch(`/api/v1/partners/${currentPartnerId}/send`, {
+        method: "POST",
+        body: JSON.stringify(partnerSendPayload),
+      });
+      resultEl.innerHTML = '<div class="banner pass">✅ Mesaj trimis.</div>';
+      await loadPartnerScores();
+    } catch (e) {
+      resultEl.innerHTML = '<div class="banner error">Eroare: ' + escapeHtml(e.message) + "</div>";
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // GET /api/v1/partners/scores — agregat pe owner (cel mai recent
+  // PDI/PIP din toti partenerii), NU per partenerul selectat. Eticheta
+  // reflecta explicit aceasta limitare (contract 37, sectiunea 6).
+  // ------------------------------------------------------------------
+  async function loadPartnerScores() {
+    const boxEl = document.getElementById("partner-scores-box");
+    try {
+      const scores = await apiFetch("/api/v1/partners/scores", { method: "GET" });
+      const pdi = scores.pdi === null || scores.pdi === undefined ? "-" : scores.pdi;
+      const pip = scores.pip === null || scores.pip === undefined ? "-" : scores.pip;
+      boxEl.textContent =
+        "Scorurile tale cele mai recente — PDI: " + pdi + ", PIP: " + pip;
+    } catch (e) {
+      boxEl.textContent = e.message;
     }
   }
 
