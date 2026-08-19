@@ -175,7 +175,7 @@ class ObjectionEngine:
                 cur.execute(query, (owner_id, conversation_id, objection_category, objection_text))
                 row = cur.fetchone()
 
-        return Objection(
+        objection = Objection(
             id=row[0],
             owner_id=row[1],
             conversation_id=row[2],
@@ -183,6 +183,8 @@ class ObjectionEngine:
             objection_text=row[4],
             resolution_status=row[5],
         )
+        self._emit_event("ObjectionCreated", objection.id, {"owner_id": str(owner_id)})
+        return objection
 
     def get_objection(self, objection_id: UUID, owner_id: UUID) -> Objection:
         """Citește o obiecție existentă (Decizia 8A, `25-get-objection-contract.md`).
@@ -274,6 +276,11 @@ class ObjectionEngine:
         validation = validate_response(response_text, objection_category, objection_text)
 
         if validation.level == "BLOCK":
+            self._emit_event("ObjectionResponseSubmitted", objection_id, {
+                "owner_id": str(owner_id),
+                "validation_level": validation.level,
+                "persisted": False,
+            })
             return SubmitResponseResult(persisted=False, validation=validation)
 
         query = """
@@ -291,4 +298,21 @@ class ObjectionEngine:
                         f"Obiecția {objection_id} nu există sau nu aparține owner-ului {owner_id}."
                     )
 
+        self._emit_event("ObjectionResponseSubmitted", objection_id, {
+            "owner_id": str(owner_id),
+            "validation_level": validation.level,
+            "persisted": True,
+        })
         return SubmitResponseResult(persisted=True, validation=validation)
+
+    def _emit_event(self, event_name: str, target_object_id: UUID, payload: dict) -> None:
+        """Scrie evenimentul în tabelul generic `events` (pattern identic cu celelalte 5 engine-uri)."""
+        from psycopg.types.json import Json
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO events (event_name, target_object, target_object_id, payload) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (event_name, "objection", target_object_id, Json(payload)),
+                )
