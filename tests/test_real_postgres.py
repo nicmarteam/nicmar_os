@@ -29,6 +29,7 @@ from src.agents.followup.followup_agent import FollowUpAgent
 from src.engines.partner.partner_engine import PartnerEngine, PartnerAccessDeniedError
 from src.agents.partner.partner_agent import PartnerAgent
 from src.agents.contact.contact_agent import ContactAgent
+from src.engines.contact.contact_engine import Contact, ContactEngine
 from src.engines.objection.objection_engine import Objection, ObjectionEngine, ObjectionNotFoundError
 from src.agents.conversation.conversation_agent import ConversationAgent
 from src.engines.conversation.conversation_engine import (
@@ -913,6 +914,52 @@ class TestConversationAgentOnRealPostgres:
                 response_text="Înțeleg, poți începe cu 10 minute pe zi.",
                 response_variant_used="DIRECTA",
             )
+
+
+class TestContactEngineOnRealPostgres:
+    """
+    Valideaza ContactEngine.create_contact() pe PostgreSQL real —
+    Decizia 42, 42-contact-events-contract.md. Gol de testare
+    identificat la audit: pana acum exista doar TestContactAgentOnRealPostgres
+    (read-only, alta componenta) — zero acoperire reala pentru scrierea
+    efectiva a unui Contact.
+    """
+
+    def test_creeaza_contact_pe_postgres_real(self):
+        owner_id = _create_user("contact-engine-create")
+        engine = ContactEngine()
+
+        contact = engine.create_contact(owner_id=owner_id, full_name="Contact Real Postgres")
+
+        assert isinstance(contact, Contact)
+        assert contact.owner_id == owner_id
+        assert contact.full_name == "Contact Real Postgres"
+        assert contact.status == "NEW"
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT owner_id, full_name, status FROM contacts WHERE id = %s",
+                    (contact.id,),
+                )
+                row = cur.fetchone()
+        assert row == (owner_id, "Contact Real Postgres", "NEW")
+
+    def test_evenimentul_contact_created_e_scris_in_events(self):
+        """Contract 42, criteriul 3."""
+        owner_id = _create_user("contact-engine-event")
+        engine = ContactEngine()
+
+        contact = engine.create_contact(owner_id=owner_id, full_name="Contact Event Test")
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT event_name, target_object FROM events WHERE target_object_id = %s",
+                    (contact.id,),
+                )
+                row = cur.fetchone()
+        assert row == ("ContactCreated", "contact")
 
 
 class TestConversationEngineOnRealPostgres:
