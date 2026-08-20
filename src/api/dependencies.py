@@ -18,6 +18,7 @@ from src.engines.contact.contact_engine import ContactEngine
 from src.agents.contact.contact_agent import ContactAgent
 from src.engines.conversation.conversation_engine import ConversationEngine
 from src.engines.priority.priority_engine import PriorityEngine
+from src.engines.outreach.outreach_engine import OutreachEngine
 
 
 def get_mission_agent() -> MissionAgent:
@@ -87,3 +88,14 @@ def get_contact_agent() -> ContactAgent:
 def get_priority_engine() -> PriorityEngine:
     """Decizia 39, `39-priority-api-contract.md` — PriorityEngine nu are dependințe proprii."""
     return PriorityEngine()
+
+
+def get_outreach_engine(
+    conversation_engine: ConversationEngine = Depends(get_conversation_engine),
+) -> OutreachEngine:
+    """
+    Decizia 46, `46-prospectare-relationala-contract.md` — chaining real
+    cu ConversationEngine (necesar pentru handoff-ul automat la
+    record_outcome), identic tipar cu get_conversation_agent (Decizia 33).
+    """
+    return OutreachEngine(conversation_engine=conversation_engine)
