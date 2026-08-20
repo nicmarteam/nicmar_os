@@ -14,7 +14,7 @@ Recomandare (09) + Reactivare (10), tratate ca **un singur mecanism**
 — `Prospectare Relațională` — cu două moduri: `REFERRAL` și
 `REACTIVATION`.
 
-## 2. Cele 7 adevăruri de business înghețate
+## 2. Cele 8 adevăruri de business înghețate
 
 1. **Nu există `PUT`/`PATCH` pentru modificarea retrospectivă a
    unui outreach.** Intervenția, odată trimisă, e imutabilă.
@@ -23,19 +23,28 @@ Recomandare (09) + Reactivare (10), tratate ca **un singur mecanism**
    ulterioare nu înseamnă nimic determinat — poate însemna oricare
    din mai multe situații diferite, nedistinse una de alta.
 3. **Rezultatul observat se înregistrează explicit**, ca fapt separat
-   de intervenția inițială, nu ca actualizare a ei.
+   de intervenția inițială, nu ca actualizare a ei. `Outcome` e
+   **entitate business proprie** (tabelă), nu doar înregistrare de
+   audit în `events` — motivat de nevoia de interogare directă
+   ("care a fost ultimul rezultat", "câte HESITATION am avut"), nu
+   doar de trasabilitate istorică.
 4. **`NO_RESPONSE` nu este un outcome.** E absența unui outcome până
    la un moment dat — o stare implicită, nu o valoare înregistrată.
-   Nu există risc de "rezultate concurente" (azi NO_RESPONSE, mâine
-   un răspuns real), pentru că nu se scrie nimic în lipsa unui
-   rezultat real.
-5. **Un outreach poate conduce ulterior către `Conversation` /
-   `Objection` / `FollowUp`** — dar acestea sunt *continuări*, nu
-   *rezultate ale outreach-ului*. Sunt concepte distincte.
-6. **`REFERRAL_RECEIVED` ≠ prospect nou.** E doar faptul că persoana
+5. **Cardinalitate: `Outreach (1) → Outcome (0..1)`**, nu `(0..N)`.
+   Un `Outreach` are cel mult un `Outcome` imediat. Derivat din
+   formularea sursei ("**deschide** 04/06/01" — verb de rutare, nu de
+   actualizare repetată).
+6. **`Outcome`-ul declanșează cel mult o predare (*handoff*)** către
+   entitatea de continuare potrivită (`Conversation`/`Objection`/
+   `FollowUp`). Orice evoluție ulterioară aparține entității de
+   continuare create, deja cu propriul ei ciclu de viață construit
+   (ex. tranzițiile `FollowUp` deja existente) — **nu** se mai scrie
+   înapoi pe `Outreach` sau pe `Outcome`-ul original, niciunul din
+   cele două nu se modifică după predare.
+7. **`REFERRAL_RECEIVED` ≠ prospect nou.** E doar faptul că persoana
    contactată a oferit o recomandare. Persoana recomandată devine
    `Contact` doar printr-un pas ulterior explicit, separat.
-7. **Nu se inventează alte rezultate** în afara celor găsite explicit
+8. **Nu se inventează alte rezultate** în afara celor găsite explicit
    în sursă (`05-competente-37-motor1.md`, Pasul 7 al Conversațiilor
    09 și 10).
 
@@ -63,26 +72,54 @@ direct din sursă**, nu inventate:
 Absența unui `Outcome` înregistrat = stare implicită "fără rezultat
 încă", niciodată o valoare scrisă explicit.
 
-Un `Outreach` poate avea, în timp, unul sau mai multe `Outcome`-uri
-succesive (ex.: azi `WILL_RESPOND_LATER`, peste 3 zile
-`HESITATION`) — fiecare e o înregistrare nouă, istoricul complet
-rămâne, nimic nu se suprascrie.
+**Cardinalitate finală, înghețată**: `Outreach (1) → Outcome (0..1)`,
+nu `(0..N)`. Motivare, derivată din formularea sursei ("**deschide**
+04", "**deschide** 06" — verb de rutare, nu de actualizare repetată):
+
+- `0` = mesajul a fost trimis, dar liderul încă n-a înregistrat
+  reacția imediată — **nu** înseamnă `NO_RESPONSE`, rămâne aceeași
+  distincție deja înghețată la Punctul 4
+- `1` = reacția imediată a fost înregistrată o singură dată
+
+**Regulă centrală, înghețată**: un `Outreach` are cel mult un
+`Outcome` imediat. `Outcome`-ul declanșează cel mult o predare
+(*handoff*) către entitatea de continuare potrivită. **Orice evoluție
+ulterioară aparține entității de continuare create (`FollowUp`,
+`Conversation`, `Objection`), nu se mai scrie înapoi pe `Outreach`
+sau pe `Outcome`-ul original.** Nici `Outreach`-ul, nici `Outcome`-ul
+nu se modifică după predare.
 
 ### 3.3. `Continuare` — ce se întâmplă mai departe, în sistemul deja construit
 
-Fiecare `Outcome` are o continuare logică firească spre infrastructura
-deja existentă:
+Fiecare `Outcome` declanșează exact o predare, o singură dată, spre
+infrastructura deja existentă — care preia de acolo propriul ei ciclu
+de viață, deja construit:
 
 ```
 QUESTION_ASKED       → Conversation (flux 01, existent)
 HESITATION            → Objection (flux 04, existent, prin Conversation)
-WILL_RESPOND_LATER     → FollowUp (flux 06, existent)
-REFERRAL_RECEIVED      → Conversation cu persoana recomandată (flux 03)
-POSITIVE_RESPONSE      → flux Invitație (07, neconstruit — gol separat, nu tratat aici)
+WILL_RESPOND_LATER     → FollowUp (flux 06, existent) — orice răspuns
+                          ulterior al persoanei se urmărește prin
+                          tranzițiile deja construite ale FollowUp-ului
+                          (PENDING→COMPLETED/POSTPONED/RESCHEDULED),
+                          nu printr-un al doilea Outcome
+REFERRAL_RECEIVED       → Conversation cu persoana recomandată (flux 03)
+POSITIVE_RESPONSE       → flux Invitație (07, neconstruit — gol separat, nu tratat aici)
 ```
 
 Continuarea *creează* o entitate existentă (Conversation/FollowUp);
-nu modifică `Outreach`-ul sau `Outcome`-ul.
+nu modifică `Outreach`-ul sau `Outcome`-ul. Responsabilitatea fiecărei
+entități rămâne strict separată:
+
+```
+Outreach    = "am făcut această intervenție"
+Outcome     = "aceasta a fost reacția imediată observată"
+FollowUp    = "persoana a spus că revine / trebuie reluată"
+Conversation = "a început conversația"
+Objection   = "a apărut o ezitare"
+Contact     = "avem o persoană în sistem"
+Events      = istoricul tehnic al tuturor tranzițiilor
+```
 
 ### 3.4. Prospect nou (cazul `REFERRAL_RECEIVED`)
 
