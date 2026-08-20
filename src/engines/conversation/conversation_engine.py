@@ -63,6 +63,7 @@ class ConversationEngine:
         owner_id: UUID,
         contact_id: UUID,
         channel: str = "WHATSAPP",
+        source_outreach_id: Optional[UUID] = None,
     ) -> Conversation:
         """Returnează conversația deschisă existentă, sau creează una nouă.
 
@@ -90,6 +91,11 @@ class ConversationEngine:
                 niciodată din payload necontrolat.
             contact_id: Contactul asociat — obligatoriu.
             channel: Canalul conversației, implicit `'WHATSAPP'`.
+            source_outreach_id: Decizia 46 — proveniența opțională dintr-un
+                `Outreach`. Se scrie **doar** pe ramura de creare nouă
+                (INSERT); o conversație deja existentă, reutilizată, NU
+                se modifică — consecvent cu regula de imutabilitate deja
+                aplicată în tot sistemul (fără `UPDATE` retroactiv).
 
         Returns:
             `Conversation` — fie cea existentă, fie cea nou creată.
@@ -132,11 +138,11 @@ class ConversationEngine:
 
                 cur.execute(
                     """
-                    INSERT INTO conversations (owner_id, contact_id, channel, status)
-                    VALUES (%s, %s, %s, 'INITIATED')
+                    INSERT INTO conversations (owner_id, contact_id, channel, status, source_outreach_id)
+                    VALUES (%s, %s, %s, 'INITIATED', %s)
                     RETURNING id, owner_id, contact_id, channel, status
                     """,
-                    (owner_id, contact_id, channel),
+                    (owner_id, contact_id, channel, source_outreach_id),
                 )
                 new_row = cur.fetchone()
 
