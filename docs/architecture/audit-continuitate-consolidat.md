@@ -61,6 +61,12 @@ real.
 
 Cazuri unde arhitectura originală a planificat explicit o
 funcționalitate, cu design detaliat, dar codul livrat nu o conține.
+Aceasta nu este o presupunere sau o funcție inventată ulterior de
+audit — arhitectura descrie explicit evenimentele, trigger-ele și
+motoarele responsabile.
+
+> **`ARCHIVED` — funcționalitate documentată explicit, dar fără
+> producător în cod.**
 
 | Element | Dovadă documentară | Dovadă de absență în cod |
 |---|---|---|
@@ -69,7 +75,8 @@ funcționalitate, cu design detaliat, dar codul livrat nu o conține.
 Acesta e diferit calitativ de un "gol" — e o intenție de design clară,
 amânată prin absența motoarelor care ar fi trebuit s-o producă
 (motoare care fac parte, cel mai probabil, din cele 12 engine-uri
-explicit post-MVP, per `07-motoare-post-mvp.md`).
+explicit post-MVP, per `07-motoare-post-mvp.md`). Este una dintre cele
+mai importante descoperiri ale acestui audit.
 
 ## 5. Ce este implementat fără decizie explicită de business
 
@@ -121,18 +128,22 @@ MVP-ului.
 | **Editarea datelor** (`PUT`/`PATCH`) | — | Zero decizie de imutabilitate documentată, în niciun sens — nici pentru, nici împotrivă |
 | **Schimbare parolă** (utilizator autentificat) | — | Netratat |
 
-## 9. Riscuri operaționale reale
+## 9. Gap operațional real
 
-Element separat de "gap de scope" — acesta e un risc concret de
-utilizare, indiferent de decizia de scope.
+Element separat de "decizie de scope" — acesta e un fapt confirmat de
+audit, indiferent de decizia ulterioară de a-l include sau nu în
+scope.
 
-> **Password recovery — absent complet.** Zero endpoint, zero UI,
-> zero strategie alternativă documentată (nici acces admin, nici
-> canal de suport). Un lider care își uită parola **nu are nicio
-> cale de recuperare prin produs** — ar necesita intervenție directă
-> asupra bazei de date. Acesta e singurul risc din acest audit care
-> poate produce **blocare completă și permanentă de acces** pentru un
-> utilizator deja activ, nu doar o limitare de funcționalitate.
+> **Password recovery — gap operațional real; decizia de includere în
+> scope rămâne deschisă.** Zero endpoint, zero UI, zero strategie
+> alternativă documentată (nici acces admin, nici canal de suport). Un
+> lider care își uită parola **nu are nicio cale de recuperare prin
+> produs** — ar necesita intervenție directă asupra bazei de date.
+> Este singurul element din acest audit care poate produce blocare
+> completă de acces pentru un utilizator deja activ, nu doar o
+> limitare de funcționalitate. Aceasta e constatarea faptică a
+> auditului; consecința ei rămâne interpretare, nu parte din
+> constatare.
 
 ## 10. Backlog rezultat — fără prioritizare
 
@@ -176,10 +187,10 @@ o decizie explicită separată:
 | Priority | 🟢 | 🟢 | 🟢 | — | 🟢 | 🟢 | 🟢 | 🟢 VALIDAT |
 | Auth (login) | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 VALIDAT |
 | Auth (register UI) | 🟡 | — | 🟢 (backend) | 🟢 | 🟢 | 🔴 | 🟢 (backend) | 🟡 SCOPE |
-| `ARCHIVED` | 🟢 | — | 🔴 | 🟢 (schemă) | 🔴 | 🔴 | — | 🔴 GAP DESIGN |
+| `ARCHIVED` | 🟢 | — | 🔴 | 🟢 (schemă) | 🔴 | 🔴 | — | 🔴 GAP DESIGN (documentat, fără producător) |
 | RBAC | ⚪ | — | 🔴 | 🟡 (fără CHECK) | — | — | — | ⚪ SCAFFOLDING |
 | JWT duration | 🔴 (nefundamentat) | — | 🟢 | — | 🟢 | 🟢 | 🟢 | 🟡 CALIBRARE |
-| Password recovery | 🔴 | — | 🔴 | — | 🔴 | 🔴 | — | 🔴 RISC OPERAȚIONAL |
+| Password recovery | 🔴 | — | 🔴 | — | 🔴 | 🔴 | — | 🔴 GAP OPERAȚIONAL |
 | `audit_log` | 🟢 (documentat) | — | 🔴 | 🟢 (schemă) | — | — | — | 🟡 DOCUMENTAȚIE |
 | ORE | 🔒 44A | 🔴 blocat | 🔴 blocat | — | — | — | — | 🔒 BLOCKED (deliberat) |
 
