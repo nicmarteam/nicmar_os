@@ -26,6 +26,10 @@ from src.engines.partner.partner_engine import (
 )
 from src.engines.objection.objection_engine import ObjectionNotFoundError
 from src.engines.conversation.conversation_engine import ConversationAccessDeniedError
+from src.engines.outreach.outreach_engine import (
+    OutreachAccessDeniedError, OutcomeAlreadyRecordedError,
+    InvalidPurposeError, InvalidToneError, InvalidOutcomeError,
+)
 
 
 def _error_response(status_code: int, error_code: str, message: str) -> JSONResponse:
@@ -41,6 +45,9 @@ ALREADY_EXISTS_ERRORS = (
     # /register. Reutilizează categoria ALREADY_EXISTS existentă (409),
     # nu introduce una nouă.
     UniqueViolation,
+    # OutcomeAlreadyRecordedError — Decizia 46: cardinalitate 0..1,
+    # semantic identic (o a doua încercare pe ceva deja existent).
+    OutcomeAlreadyRecordedError,
 )
 ACCESS_DENIED_ERRORS = (
     MissionAccessDeniedError, FollowUpAccessDeniedError, PartnerAccessDeniedError,
@@ -53,6 +60,8 @@ ACCESS_DENIED_ERRORS = (
     # până acum (ConversationEngine nu avea niciun endpoint HTTP înainte
     # de acest contract). Semantic identică cu restul categoriei.
     ConversationAccessDeniedError,
+    # OutreachAccessDeniedError — Decizia 46: identic tipar.
+    OutreachAccessDeniedError,
 )
 INVALID_TRANSITION_ERRORS = (
     InvalidTransitionError, FollowUpInvalidTransitionError, InvalidDiagnosticTypeError,
@@ -60,6 +69,11 @@ INVALID_TRANSITION_ERRORS = (
 CONFIRMATION_REQUIRED_ERRORS = (
     HumanConfirmationRequiredError, FollowUpHumanConfirmationRequiredError,
     PartnerHumanConfirmationRequiredError,
+)
+# Decizia 46 — grup nou, distinct de INVALID_TRANSITION (nu sunt tranziții
+# de stare, sunt valori de enum invalide pe câmpuri noi: purpose/tone/outcome).
+INVALID_VALUE_ERRORS = (
+    InvalidPurposeError, InvalidToneError, InvalidOutcomeError,
 )
 
 
@@ -92,6 +106,9 @@ def register_exception_handlers(app):
     async def handle_invalid_reference(request: Request, exc: ForeignKeyViolation):
         return _error_response(400, "INVALID_REFERENCE", str(exc))
 
+    async def handle_invalid_value(request: Request, exc: Exception):
+        return _error_response(400, "INVALID_VALUE", str(exc))
+
     for exc_cls in ALREADY_EXISTS_ERRORS:
         app.add_exception_handler(exc_cls, handle_already_exists)
     for exc_cls in ACCESS_DENIED_ERRORS:
@@ -100,6 +117,8 @@ def register_exception_handlers(app):
         app.add_exception_handler(exc_cls, handle_invalid_transition)
     for exc_cls in CONFIRMATION_REQUIRED_ERRORS:
         app.add_exception_handler(exc_cls, handle_confirmation_required)
+    for exc_cls in INVALID_VALUE_ERRORS:
+        app.add_exception_handler(exc_cls, handle_invalid_value)
 
     # Decizia 26A — ValueError (categorie invalidă la /prepare) -> 400 INVALID_CATEGORY
     app.add_exception_handler(ValueError, handle_invalid_category)
