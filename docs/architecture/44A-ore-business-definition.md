@@ -1,8 +1,9 @@
 # Decizia 44A — ORE Business Definition
 
-Status: ÎN LUCRU (owner, 20 august 2026) — Punctele 1-4, 3A, 3B, 5
-(principiu), 6 (principiu), 8, 9 înghețate. Punctele 5a, 6a, 10, 11
-rămân deschise.
+Status: ÎN LUCRU (owner, 20 august 2026) — 11 din 13 puncte decizionale
+înghețate. Rămân deschise, ca parametri de calibrare fără bază de
+business găsită: **5a** (lungimea ferestrei mobile de agregare) și
+**6a** (pragul minim de intervenții pentru afișarea unui procent).
 
 ## 0. Context și regulă de lucru
 
@@ -213,20 +214,83 @@ rezultatul: crearea de noi `ObjectionResponseSubmitted` eligibile,
 crearea de noi `FollowUp`, trecerea timpului (maturizarea
 intervențiilor).
 
-## 10. Cum intră ulterior în OPI — 🟡 DESCHIS
+## 10. Cum intră ulterior în OPI — 🔒 ÎNGHEȚAT (deferat)
 
-Neanalizat încă. `OPI` (Overall Performance Index) e compozit din cei
-12 KPI operaționali (`04-KPI-REG-001.md`), dar propria lui formulă e
-tot `PROPOSED`/nedefinită. Dependent de rezolvarea parametrilor
-deschiși de mai sus (5a, 6a) și de propria definiție a OPI, care nu a
-fost auditată în cadrul acestei decizii.
+> Integrarea ORE în OPI **nu poate fi decisă izolat**. `OPI` are o
+> structură formală definită (`OPI = Σ(wᵢ × KPIᵢ)`, `Σwᵢ = 1`), dar
+> **nicio pondere `wᵢ` concretă nu există pentru niciunul dintre cei
+> 12 KPI operaționali**, iar formula proprie a OPI rămâne `PROPOSED`,
+> identic ca statut cu ORE. Decizia ponderii ORE în OPI trebuie luată
+> ca parte a unei decizii de business separate și mai ample —
+> definirea completă a OPI — nu inventată izolat aici. Politica
+> documentată pentru date lipsă (`03-rule-model-001.md`, secțiunea 17:
+> „un input lipsă nu primește automat 0”, statusuri
+> `MISSING`/`NOT_APPLICABLE`) confirmă independent principiul deja
+> înghețat la Punctul 6 pentru ORE.
+>
+> **Notă tehnică de consemnat pentru contractul viitor**: frecvența
+> documentată a OPI (`EVENT-DRIVEN + DAILY`) presupune un model de
+> snapshot periodic, în tensiune cu decizia de la Punctul 8 (ORE
+> calculat live, fără persistare) — de rezolvat explicit când se
+> definește integrarea, nu presupus acum.
 
-## 11. Ce NU măsoară ORE — 🟡 DESCHIS
+**Verificare de audit efectuată**: `KPI-ARCH-001` (documentul care ar
+conține politica oficială de date lipsă) **nu există în repo**, la fel
+ca `KPI-MODEL-001`. Nicio valoare `wᵢ` concretă nu apare nicăieri
+pentru niciunul dintre cei 12 KPI.
 
-Neanalizat explicit ca punct separat, deși implicit consemnat prin
-excluderile din Punctele 1, 3B, 4. De formalizat ca listă explicită
-înainte de contractul tehnic final, pentru a preveni ambiguități
-viitoare (cerința inițială a owner-ului).
+**Descoperire de validare independentă**: regula deja înghețată la
+Punctul 6 pentru ORE (`"date insuficiente" ≠ 0%`) e confirmată,
+independent, de politica arhitecturală transversală deja documentată
+pentru toată familia de KPI (`03-rule-model-001.md`, secțiunea 17).
+ORE nu doar corect semantic — e aliniat cu o regulă deja existentă la
+nivel de sistem, descoperită abia acum.
+
+## 11. Ce NU măsoară ORE — 🔒 ÎNGHEȚAT
+
+> ORE este o metrică descriptivă a progresului observabil după
+> intervențiile eligibile asupra obiecțiilor; nu este o metrică de
+> competență generală, cauzalitate, satisfacție, conversie comercială
+> sau performanță comparativă între lideri.
+
+**Interpretare corectă vs. incorectă, consemnată explicit**:
+- ❌ *"Nic are ORE 40%, deci Nic este un lider slab."*
+- ✅ *"În setul de intervenții eligibile și maturizate incluse în
+  calcul, 40% au fost urmate de un FollowUp creat în fereastra
+  definită."*
+
+**A — excluderi deja stabilite prin punctele anterioare (consolidate):**
+1. Auto-declararea liderului că a rezolvat obiecția
+2. Preferința pentru varianta de răspuns
+3. Simpla continuare a conversației
+4. Rezolvarea obiectivă a obiecției
+5. O relație cauzală demonstrată între răspuns și progres
+6. Intervențiile `BLOCK`
+7. Obiecțiile fără `conversation_id`
+8. Follow-up-urile marcate `COMPLETED` ca dovadă de progres
+9. Conversia în `Partner`
+
+**B — limite semantice explicite, noi:**
+10. Competența generală a liderului
+11. Dificultatea obiecțiilor gestionate
+12. Satisfacția generală a prospectului/clientului
+13. Rezultatul comercial final (conversie, vânzare)
+14. Viteza de răspuns a liderului
+15. Clasamentul sau ierarhizarea liderilor — **ORE nu este definit ca
+    metrică de clasament sau ierarhizare între lideri**; două valori
+    pot fi comparate tehnic, dar contractul nu autorizează un
+    leaderboard/ranking fără o decizie de business separată
+16. Un predictor statistic/econometric validat al succesului comercial
+    pe termen lung
+17. Contextul extern al prospectului (indisponibilitate,
+    circumstanțe, independent de calitatea răspunsului)
+
+**Notă de implementare reținută, dar nu decisă acum**: punctele B10 și
+B15 (competența generală, clasamentul) au risc real de interpretare
+greșită în afara sistemului (discuții de management), nu doar risc
+tehnic — merită reflectate ulterior explicit în eticheta din
+Workbench, similar cu "valoare operațională curentă" de la DIS. Decizia
+de UX rămâne separată, ulterioară înghețării contractului de business.
 
 ## 12. Status consolidat
 
@@ -243,9 +307,16 @@ viitoare (cerința inițială a owner-ului).
 | 6a | Prag minim N | 🟡 deschis — fără bază de business |
 | 8 | Când se calculează | 🔒 live, fără persistare |
 | 9 | Ce evenimente îl actualizează | 🔒 niciunul direct |
-| 10 | Integrare în OPI | 🟡 deschis — neanalizat |
-| 11 | Ce NU măsoară (listă explicită) | 🟡 deschis — neformalizat |
+| 10 | Integrare în OPI | 🔒 deferat explicit — depinde de definiția completă a OPI |
+| 11 | Ce NU măsoară (listă explicită) | 🔒 A1-A9 + B10-B17 |
 
-**Nu se scrie contractul tehnic final** până când Punctele 10 și 11
-sunt rezolvate și, opțional, până când 5a/6a primesc fie o bază de
-business, fie o decizie explicită de a le stabili empiric/tehnic.
+**11 din 13 puncte decizionale înghețate.** Rămân deschise exclusiv
+**5a** și **6a** — doi parametri de calibrare numerică, fără bază de
+business documentată găsită prin audit exhaustiv, spre deosebire de
+toate celelalte valori din acest document (7 zile, scala 0-100,
+excluderile), toate ancorate fie în documentație existentă, fie în
+raționament de business explicit aprobat.
+
+**Nu se scrie contractul tehnic final** până când 5a și 6a sunt
+rezolvate — fie empiric (după acumularea de date reale din utilizare),
+fie printr-o decizie de business separată, dacă apare un reper nou.
