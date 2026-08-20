@@ -1,9 +1,15 @@
 # Decizia 44A — ORE Business Definition
 
-Status: ÎN LUCRU (owner, 20 august 2026) — 11 din 13 puncte decizionale
-înghețate. Rămân deschise, ca parametri de calibrare fără bază de
-business găsită: **5a** (lungimea ferestrei mobile de agregare) și
-**6a** (pragul minim de intervenții pentru afișarea unui procent).
+Status: CONCEPTUAL COMPLETĂ, CALIBRARE DESCHISĂ (owner, 20 august 2026)
+— toate deciziile conceptuale ale ORE sunt înghețate: ce este ORE, ce
+rezultat măsoară, fereastra de observație (7 zile), semnalul
+observabil, eligibilitatea datelor, principiul agregării, momentul
+calculului, absența persistării, relația cu OPI, limitele explicite.
+Rămân deschiși, **intenționat**, doi parametri de calibrare numerică —
+**5a** (lungimea ferestrei mobile de agregare) și **6a** (pragul minim
+de intervenții pentru afișarea unui procent) — fără bază de business
+găsită prin audit exhaustiv. Aceștia nu sunt găuri conceptuale, ci
+subdecizii tehnice de calibrare, tratate deliberat separat.
 
 ## 0. Context și regulă de lucru
 
@@ -310,13 +316,41 @@ de UX rămâne separată, ulterioară înghețării contractului de business.
 | 10 | Integrare în OPI | 🔒 deferat explicit — depinde de definiția completă a OPI |
 | 11 | Ce NU măsoară (listă explicită) | 🔒 A1-A9 + B10-B17 |
 
-**11 din 13 puncte decizionale înghețate.** Rămân deschise exclusiv
-**5a** și **6a** — doi parametri de calibrare numerică, fără bază de
-business documentată găsită prin audit exhaustiv, spre deosebire de
-toate celelalte valori din acest document (7 zile, scala 0-100,
-excluderile), toate ancorate fie în documentație existentă, fie în
-raționament de business explicit aprobat.
+## 13. Calibrarea parametrilor deschiși — decizie de strategie
 
-**Nu se scrie contractul tehnic final** până când 5a și 6a sunt
-rezolvate — fie empiric (după acumularea de date reale din utilizare),
-fie printr-o decizie de business separată, dacă apare un reper nou.
+Pentru 5a și 6a au fost analizate două variante:
+
+- **Varianta A — calibrare empirică**: ORE v1 se construiește cu
+  acești doi parametri configurabili, fără valori hardcodate de
+  business. După acumularea de date reale (câte intervenții maturizate
+  are un lider într-o perioadă tipică, cât de stabil rămâne ORE la
+  ferestre diferite, cât de des apare `N` foarte mic, cât de volatil e
+  scorul), se ia o decizie de business bazată pe distribuția reală
+  observată.
+- **Varianta B — decizie de business explicită acum**: dacă apare un
+  motiv comercial clar pentru o anumită perioadă/prag, acestea se
+  fixează acum, documentate explicit ca decizii de business, nu ca
+  valori tehnice convenabile.
+
+**Decizie: Varianta A.** Nu există în acest moment dovada necesară
+pentru a afirma că 30/60/90 de zile reprezintă "perioada operațională
+corectă", nici că `N=5` sau `N=10` oferă semnificație statistică
+suficientă pentru un lider tipic NicMar OS. Aceasta e o poziție mai
+solidă decât un document declarat "100% complet" doar prin introducerea
+a două cifre fără fundamentare.
+
+**Consecință directă pentru implementare**: contractul tehnic final al
+ORE trebuie să trateze 5a și 6a ca **parametri configurabili**, nu ca
+constante hardcodate — inclusiv comportamentul explicit al sistemului
+când `N` e sub prag (starea "date insuficiente", deja înghețată la
+Punctul 6). **Nu se începe implementarea ORE** până când acest
+comportament e fixat explicit în contract, chiar dacă valorile
+numerice exacte rămân calibrabile ulterior, pe bază de date reale.
+
+## 14. Rezumat final
+
+44A este **conceptual completă** — toate cele 10 decizii conceptuale
+majore sunt înghețate. Rămân, intenționat, **doi parametri de
+calibrare tehnică** (5a, 6a), de rezolvat prin Varianta A (calibrare
+empirică, după acumulare de date reale de utilizare), nu prin alegere
+arbitrară acum.
