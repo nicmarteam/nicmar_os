@@ -249,3 +249,34 @@ class PrioritizedActivityResponse(BaseModel):
     impact: float
     urgency: float
     vechime_seconds: float
+
+
+# ------------------------------------------------------------------
+# Outreach — sursă: 46-prospectare-relationala-contract.md
+# ------------------------------------------------------------------
+
+class CreateOutreachRequest(BaseModel):
+    contact_id: UUID
+    purpose: str
+    message_text: str
+    tone_used: str
+
+
+class OutreachResponse(BaseModel):
+    id: UUID
+    owner_id: UUID
+    contact_id: UUID
+    purpose: str
+    message_text: str
+    tone_used: str
+
+
+class RecordOutcomeRequest(BaseModel):
+    outcome: str
+
+
+class OutcomeResponse(BaseModel):
+    id: UUID
+    outreach_id: UUID
+    outcome: str
+    conversation_id: Optional[UUID]
