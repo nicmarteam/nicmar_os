@@ -35,6 +35,9 @@ from src.agents.conversation.conversation_agent import ConversationAgent
 from src.engines.conversation.conversation_engine import (
     Conversation, ConversationEngine, ConversationAccessDeniedError,
 )
+from src.engines.outreach.outreach_engine import (
+    OutreachEngine, OutreachAccessDeniedError, OutcomeAlreadyRecordedError,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -1175,3 +1178,168 @@ class TestConversationEngineOnRealPostgres:
                 )
                 row = cur.fetchone()
         assert row == ("ConversationCreated", "conversation")
+
+
+class TestOutreachEngineOnRealPostgres:
+    """
+    Teste RED pe PostgreSQL real — Decizia 46,
+    46-prospectare-relationala-contract.md.
+    """
+
+    def _create_contact(self, owner_id):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO contacts (owner_id, full_name, status) "
+                    "VALUES (%s, %s, 'ACTIVE') RETURNING id",
+                    (owner_id, "Contact Test OutreachEngine"),
+                )
+                return cur.fetchone()[0]
+
+    def _engine(self):
+        return OutreachEngine(conversation_engine=ConversationEngine())
+
+    def test_creeaza_outreach_pe_postgres_real(self):
+        owner_id = _create_user("outreach-create")
+        contact_id = self._create_contact(owner_id)
+        engine = self._engine()
+
+        outreach = engine.create_outreach(
+            owner_id=owner_id, contact_id=contact_id, purpose="REFERRAL",
+            message_text="Salut! Ai pe cineva în minte?", tone_used="CALDA",
+        )
+
+        assert outreach.purpose == "REFERRAL"
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT owner_id, contact_id, purpose, tone_used FROM outreach_attempts WHERE id = %s",
+                    (outreach.id,),
+                )
+                row = cur.fetchone()
+        assert row == (owner_id, contact_id, "REFERRAL", "CALDA")
+
+    def test_evenimentul_outreach_sent_e_scris_in_events(self):
+        owner_id = _create_user("outreach-event")
+        contact_id = self._create_contact(owner_id)
+        engine = self._engine()
+
+        outreach = engine.create_outreach(
+            owner_id=owner_id, contact_id=contact_id, purpose="REACTIVATION",
+            message_text="Bună, ce mai faci?", tone_used="RELAXATA",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT event_name, target_object FROM events WHERE target_object_id = %s",
+                    (outreach.id,),
+                )
+                row = cur.fetchone()
+        assert row == ("OutreachSent", "outreach")
+
+    def test_record_outcome_hesitation_creeaza_conversatie_cu_source_outreach_id(self):
+        """Contract 46, §3.3 — handoff real, verificat cap-coadă pe PostgreSQL."""
+        owner_id = _create_user("outreach-handoff")
+        contact_id = self._create_contact(owner_id)
+        engine = self._engine()
+
+        outreach = engine.create_outreach(
+            owner_id=owner_id, contact_id=contact_id, purpose="REFERRAL",
+            message_text="x", tone_used="DIRECTA",
+        )
+        result = engine.record_outcome(owner_id=owner_id, outreach_id=outreach.id, outcome="HESITATION")
+
+        assert result.conversation_id is not None
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT source_outreach_id FROM conversations WHERE id = %s",
+                    (result.conversation_id,),
+                )
+                row = cur.fetchone()
+        assert row == (outreach.id,)
+
+    def test_record_outcome_referral_received_nu_creeaza_conversatie(self):
+        owner_id = _create_user("outreach-no-handoff")
+        contact_id = self._create_contact(owner_id)
+        engine = self._engine()
+
+        outreach = engine.create_outreach(
+            owner_id=owner_id, contact_id=contact_id, purpose="REFERRAL",
+            message_text="x", tone_used="CALDA",
+        )
+        result = engine.record_outcome(
+            owner_id=owner_id, outreach_id=outreach.id, outcome="REFERRAL_RECEIVED",
+        )
+
+        assert result.conversation_id is None
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM conversations WHERE source_outreach_id = %s",
+                    (outreach.id,),
+                )
+                count = cur.fetchone()[0]
+        assert count == 0
+
+    def test_al_doilea_outcome_pe_acelasi_outreach_esueaza_la_nivel_de_db(self):
+        """Contract 46, §3.2 — cardinalitate 0..1, garantată prin UNIQUE la nivel de DB, nu doar de cod."""
+        owner_id = _create_user("outreach-unique")
+        contact_id = self._create_contact(owner_id)
+        engine = self._engine()
+
+        outreach = engine.create_outreach(
+            owner_id=owner_id, contact_id=contact_id, purpose="REACTIVATION",
+            message_text="x", tone_used="CALDA",
+        )
+        engine.record_outcome(owner_id=owner_id, outreach_id=outreach.id, outcome="QUESTION_ASKED")
+
+        with pytest.raises(OutcomeAlreadyRecordedError):
+            engine.record_outcome(owner_id=owner_id, outreach_id=outreach.id, outcome="HESITATION")
+
+    def test_get_or_create_conversation_reutilizata_nu_primeste_source_outreach_id_retroactiv(self):
+        """
+        Contract 46, §2 punctul 5 + regula de idempotency (b): o conversatie
+        DEJA existenta, reutilizata, NU se modifica retroactiv — ramane
+        fara source_outreach_id daca a fost creata inainte de acest outreach.
+        """
+        owner_id = _create_user("outreach-idempotent")
+        contact_id = self._create_contact(owner_id)
+        conversation_engine = ConversationEngine()
+        engine = OutreachEngine(conversation_engine=conversation_engine)
+
+        # conversatie deja existenta, FARA legatura cu vreun outreach
+        existing_conversation = conversation_engine.get_or_create_conversation(
+            owner_id=owner_id, contact_id=contact_id,
+        )
+
+        outreach = engine.create_outreach(
+            owner_id=owner_id, contact_id=contact_id, purpose="REFERRAL",
+            message_text="x", tone_used="CALDA",
+        )
+        result = engine.record_outcome(owner_id=owner_id, outreach_id=outreach.id, outcome="QUESTION_ASKED")
+
+        assert result.conversation_id == existing_conversation.id
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT source_outreach_id FROM conversations WHERE id = %s",
+                    (existing_conversation.id,),
+                )
+                row = cur.fetchone()
+        assert row == (None,)
+
+    def test_owner_a_nu_poate_inregistra_outcome_pe_outreach_ul_lui_b(self):
+        owner_a = _create_user("outreach-owner-a")
+        owner_b = _create_user("outreach-owner-b")
+        contact_b = self._create_contact(owner_b)
+        engine = self._engine()
+
+        outreach_b = engine.create_outreach(
+            owner_id=owner_b, contact_id=contact_b, purpose="REFERRAL",
+            message_text="x", tone_used="CALDA",
+        )
+
+        with pytest.raises(OutreachAccessDeniedError):
+            engine.record_outcome(owner_id=owner_a, outreach_id=outreach_b.id, outcome="HESITATION")
