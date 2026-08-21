@@ -819,3 +819,115 @@ def test_dis_followup_foloseste_method_get(workbench_content):
         'Apelul catre /api/v1/followups/dis-score trebuie sa foloseasca '
         'explicit method: "GET".'
     )
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 46A (RED, 20 august 2026) — Workbench Prospectare Relationala.
+# Sursa: 46A-workbench-prospectare-contract.md, sectiunea 5.
+#
+# Conventie: implementarea GREEN trebuie sa delimiteze payload-urile
+# intre marcaje explicite:
+#   // OUTREACH_CREATE_PAYLOAD_START ... // OUTREACH_CREATE_PAYLOAD_END
+#   // OUTREACH_OUTCOME_PAYLOAD_START ... // OUTREACH_OUTCOME_PAYLOAD_END
+# ----------------------------------------------------------------------
+
+
+def test_contine_endpoint_post_outreach(workbench_content):
+    """Contract 46A, criteriul 1."""
+    assert "/api/v1/outreach" in workbench_content
+
+
+def test_contine_endpoint_outreach_outcome(workbench_content):
+    """Contract 46A, criteriul 2."""
+    assert re.search(r"/api/v1/outreach/\$\{[^}]+\}/outcome", workbench_content), (
+        "Lipseste template-ul de URL pentru POST /outreach/{id}/outcome."
+    )
+
+
+def test_outreach_create_payload_campuri_exacte(workbench_content):
+    """Contract 46A, criteriul 3 — exact cele 4 campuri din CreateOutreachRequest."""
+    block = _extract_marked_block(workbench_content, "OUTREACH_CREATE_PAYLOAD")
+    for field in ("contact_id", "purpose", "message_text", "tone_used"):
+        assert field in block, f"Campul '{field}' lipseste din payload-ul de creare."
+    assert "owner_id" not in block
+
+
+def test_outcome_payload_contine_doar_outcome(workbench_content):
+    """Contract 46A, criteriul 4."""
+    block = _extract_marked_block(workbench_content, "OUTREACH_OUTCOME_PAYLOAD")
+    assert "outcome" in block
+    assert "owner_id" not in block
+    assert "outreach_id" not in block, (
+        "outreach_id vine din URL (path param), nu trebuie duplicat in body."
+    )
+
+
+def test_ambele_purposes_prezente(workbench_content):
+    """Contract 46A, criteriul 5 — ambele moduri ale mecanismului unificat."""
+    for purpose in ("REFERRAL", "REACTIVATION"):
+        assert purpose in workbench_content, f"Purpose '{purpose}' lipseste din Workbench."
+
+
+def test_toate_cele_5_outcomes_prezente(workbench_content):
+    """Contract 46A, criteriul 6 — toate valorile din Contractul 46, §3.2."""
+    for outcome in ("QUESTION_ASKED", "HESITATION", "WILL_RESPOND_LATER",
+                    "REFERRAL_RECEIVED", "POSITIVE_RESPONSE"):
+        assert outcome in workbench_content, f"Outcome '{outcome}' lipseste din Workbench."
+
+
+def test_cele_3_tonuri_prezente(workbench_content):
+    """Contract 46A, criteriul 7."""
+    for tone in ("CALDA", "RELAXATA", "DIRECTA"):
+        assert tone in workbench_content, f"Tonul '{tone}' lipseste din Workbench."
+
+
+def test_zona_outreach_activa_dupa_login(workbench_content):
+    """
+    Contract 46A, criteriul 8: panoul exista cu id="panel-outreach",
+    disabled implicit, activat direct in login() — independent de
+    currentContactId, ca Mission/Priority.
+    """
+    assert re.search(r'class="panel disabled"\s+id="panel-outreach"', workbench_content), (
+        'Panoul Outreach trebuie sa existe cu id="panel-outreach" si clasa "disabled".'
+    )
+    login_match = re.search(r"async function login\(\)(.*?)\n  \}", workbench_content, re.DOTALL)
+    assert login_match is not None, "Functia login() nu a fost gasita in forma asteptata."
+    assert 'setPanelEnabled("panel-outreach", true)' in login_match.group(1), (
+        "panel-outreach trebuie activat direct in login()."
+    )
+
+
+def test_conversation_id_din_outcome_afisat_liderului(workbench_content):
+    """
+    Contract 46A, criteriul 9: cand backend-ul intoarce conversation_id
+    (handoff realizat), liderul trebuie sa vada un mesaj explicit — nu
+    se ignora silentios.
+    """
+    assert "conversation_id" in workbench_content, (
+        "Raspunsul de la /outcome contine conversation_id — trebuie citit, nu ignorat."
+    )
+    assert "Conversație deschisă" in workbench_content, (
+        "Liderul trebuie sa vada un mesaj explicit cand s-a deschis o conversatie."
+    )
+
+
+def test_contextul_persoanei_afisat_inainte_de_mesaj(workbench_content):
+    """
+    Contract 46A, criteriul 10 + §3: NICMAR arata contextul persoanei
+    (de ce apare acum, ce relatie exista, ce s-a intamplat ultima data),
+    nu doar un formular gol. Toate campurile vin din GET /contacts,
+    deja existent — zero backend nou.
+    """
+    outreach_context_match = re.search(
+        r"function renderOutreachContext\((.*?)\n  \}", workbench_content, re.DOTALL,
+    )
+    assert outreach_context_match is not None, (
+        "Lipseste functia renderOutreachContext() — NICMAR trebuie sa afiseze "
+        "contextul persoanei inainte ca liderul sa scrie mesajul (contract 46A, §3)."
+    )
+    context_block = outreach_context_match.group(1)
+    for field in ("reason", "status", "last_followup_status"):
+        assert "." + field in context_block, (
+            f"Contextul persoanei trebuie sa citeasca explicit '{field}' "
+            f"(contract 46A, §3)."
+        )
