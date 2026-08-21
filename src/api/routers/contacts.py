@@ -37,6 +37,11 @@ def list_contacts(
             last_followup_at=s.last_followup_at, last_followup_status=s.last_followup_status,
             converted_to=s.converted_to, pdi=s.pdi, pip=s.pip, reason=s.reason,
             partner_id=s.partner_id,
+            relationship_category=s.relationship_category,
+            relationship_level=s.relationship_level,
+            last_contact_approx=s.last_contact_approx,
+            significant_context=s.significant_context,
+            perceived_interest=s.perceived_interest,
         )
         for s in summaries
     ]
@@ -61,9 +66,19 @@ def create_contact(
         email=body.email,
         source=body.source,
         metadata=body.metadata,
+        relationship_category=body.relationship_category,
+        relationship_level=body.relationship_level,
+        last_contact_approx=body.last_contact_approx,
+        significant_context=body.significant_context,
+        perceived_interest=body.perceived_interest,
     )
     return ContactResponse(
         id=contact.id, owner_id=contact.owner_id, full_name=contact.full_name,
         phone=contact.phone, email=contact.email, status=contact.status,
         source=contact.source, metadata=contact.metadata,
+        relationship_category=contact.relationship_category,
+        relationship_level=contact.relationship_level,
+        last_contact_approx=contact.last_contact_approx,
+        significant_context=contact.significant_context,
+        perceived_interest=contact.perceived_interest,
     )
