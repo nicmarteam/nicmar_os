@@ -16,6 +16,10 @@ from psycopg.types.json import Json
 from src.data.db import get_connection
 
 
+class InvalidRelationshipValueError(Exception):
+    """Valoare în afara enum-urilor permise pentru câmpurile de relație (Decizia 47)."""
+
+
 @dataclass(frozen=True)
 class Contact:
     """Reprezentarea unui contact, așa cum e citit din `contacts`.
