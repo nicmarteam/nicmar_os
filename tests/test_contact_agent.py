@@ -134,8 +134,8 @@ def test_list_prioritized_contacts_exclude_archived(agent):
     owner_id = uuid4()
 
     rows = [
-        (contact_id_active, "Ana Pop", "ACTIVE", None, None, None, NOW, None),
-        (contact_id_archived, "Ion Vechi", "ARCHIVED", None, None, None, NOW, None),
+        (contact_id_active, "Ana Pop", "ACTIVE", None, None, None, NOW, None, None, None, None, None, None),
+        (contact_id_archived, "Ion Vechi", "ARCHIVED", None, None, None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -165,8 +165,8 @@ def test_sortare_followup_scadent_inaintea_celor_fara_followup(agent):
     rows = [
         # Contact fara followup listat primul in randurile brute,
         # dar trebuie sa apara AL DOILEA in rezultat (dupa sortare).
-        (contact_fara_followup, "Maria Ionescu", "ACTIVE", None, None, None, NOW, None),
-        (contact_scadent, "Vasile Pop", "ACTIVE", PAST, "PENDING", None, NOW, None),
+        (contact_fara_followup, "Maria Ionescu", "ACTIVE", None, None, None, NOW, None, None, None, None, None, None),
+        (contact_scadent, "Vasile Pop", "ACTIVE", PAST, "PENDING", None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -190,8 +190,8 @@ def test_sortare_fara_followup_inaintea_restului(agent):
     contact_followup_completat = uuid4()
 
     rows = [
-        (contact_followup_completat, "Radu Stan", "ACTIVE", PAST, "COMPLETED", None, NOW, None),
-        (contact_fara_followup, "Elena Marin", "ACTIVE", None, None, None, NOW, None),
+        (contact_followup_completat, "Radu Stan", "ACTIVE", PAST, "COMPLETED", None, NOW, None, None, None, None, None, None),
+        (contact_fara_followup, "Elena Marin", "ACTIVE", None, None, None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -214,8 +214,8 @@ def test_sortare_followup_viitor_nu_e_scadent(agent):
     contact_viitor = uuid4()
 
     rows = [
-        (contact_viitor, "Dan Ilie", "ACTIVE", FUTURE, "PENDING", None, NOW, None),
-        (contact_scadent, "Ioana Rusu", "ACTIVE", PAST, "PENDING", None, NOW, None),
+        (contact_viitor, "Dan Ilie", "ACTIVE", FUTURE, "PENDING", None, NOW, None, None, None, None, None, None),
+        (contact_scadent, "Ioana Rusu", "ACTIVE", PAST, "PENDING", None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -235,8 +235,8 @@ def test_sortare_restul_dupa_updated_at_desc(agent):
     contact_recent = uuid4()
 
     rows = [
-        (contact_vechi, "Costin Voicu", "ACTIVE", PAST, "COMPLETED", None, PAST, None),
-        (contact_recent, "Bianca Toma", "ACTIVE", PAST, "COMPLETED", None, NOW, None),
+        (contact_vechi, "Costin Voicu", "ACTIVE", PAST, "COMPLETED", None, PAST, None, None, None, None, None, None),
+        (contact_recent, "Bianca Toma", "ACTIVE", PAST, "COMPLETED", None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -260,7 +260,7 @@ def test_converted_client_nu_are_pdi_pip(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Client Nou", "CONVERTED", None, None, "client", NOW, None),
+        (contact_id, "Client Nou", "CONVERTED", None, None, "client", NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -286,7 +286,7 @@ def test_converted_partner_fara_scor_persistat_ramane_none(agent):
     partner_id = uuid4()
 
     rows = [
-        (contact_id, "Partener Nou", "CONVERTED", None, None, "partner", NOW, partner_id),
+        (contact_id, "Partener Nou", "CONVERTED", None, None, "partner", NOW, partner_id, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -310,7 +310,7 @@ def test_converted_partner_cu_scor_persistat_populeaza_pdi_pip(agent):
     partner_id = uuid4()
 
     contact_rows = [
-        (contact_id, "Partener Activ", "CONVERTED", None, None, "partner", NOW, partner_id),
+        (contact_id, "Partener Activ", "CONVERTED", None, None, "partner", NOW, partner_id, None, None, None, None, None),
     ]
     score_rows = [(partner_id, "PDI", 1.0), (partner_id, "PIP", 1.0)]
 
@@ -353,8 +353,8 @@ def test_pdi_pip_per_partener_individual_nu_agregat_pe_owner(agent):
     partner_b = uuid4()
 
     contact_rows = [
-        (contact_a, "Contact A", "CONVERTED", None, None, "partner", NOW, partner_a),
-        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b),
+        (contact_a, "Contact A", "CONVERTED", None, None, "partner", NOW, partner_a, None, None, None, None, None),
+        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b, None, None, None, None, None),
     ]
     # Ordinea intentionat "inversata" fata de contacte, ca sa dovedim ca
     # maparea se face explicit prin partner_id, nu prin ordinea randurilor.
@@ -412,7 +412,7 @@ def test_reason_followup_scadent(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Contact Scadent", "ACTIVE", PAST, "PENDING", None, NOW, None),
+        (contact_id, "Contact Scadent", "ACTIVE", PAST, "PENDING", None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -430,7 +430,7 @@ def test_reason_fara_niciun_followup(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Contact Fara FollowUp", "ACTIVE", None, None, None, NOW, None),
+        (contact_id, "Contact Fara FollowUp", "ACTIVE", None, None, None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -449,7 +449,7 @@ def test_reason_followup_viitor(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Contact Viitor", "ACTIVE", FUTURE, "PENDING", None, NOW, None),
+        (contact_id, "Contact Viitor", "ACTIVE", FUTURE, "PENDING", None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -468,7 +468,7 @@ def test_reason_followup_completat(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Contact Completat", "ACTIVE", PAST, "COMPLETED", None, NOW, None),
+        (contact_id, "Contact Completat", "ACTIVE", PAST, "COMPLETED", None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -491,8 +491,8 @@ def test_reason_nu_afecteaza_ordinea_sortarii(agent):
     contact_viitor = uuid4()
 
     rows = [
-        (contact_viitor, "Contact Viitor", "ACTIVE", FUTURE, "PENDING", None, NOW, None),
-        (contact_scadent, "Contact Scadent", "ACTIVE", PAST, "PENDING", None, NOW, None),
+        (contact_viitor, "Contact Viitor", "ACTIVE", FUTURE, "PENDING", None, NOW, None, None, None, None, None, None),
+        (contact_scadent, "Contact Scadent", "ACTIVE", PAST, "PENDING", None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -522,7 +522,7 @@ def test_converted_fara_client_fara_partner_nu_produce_crash(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Contact Inconsistent", "CONVERTED", None, None, None, NOW, None),
+        (contact_id, "Contact Inconsistent", "CONVERTED", None, None, None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -561,8 +561,8 @@ def test_partner_id_expus_pentru_contact_convertit(agent):
     partner_b = uuid4()
 
     rows = [
-        (contact_a, "Contact A", "CONVERTED", None, None, "partner", NOW, partner_a),
-        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b),
+        (contact_a, "Contact A", "CONVERTED", None, None, "partner", NOW, partner_a, None, None, None, None, None),
+        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -586,7 +586,7 @@ def test_partner_id_none_pentru_contact_neconvertit(agent):
     contact_id = uuid4()
 
     rows = [
-        (contact_id, "Contact Neconvertit", "ACTIVE", None, None, None, NOW, None),
+        (contact_id, "Contact Neconvertit", "ACTIVE", None, None, None, NOW, None, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
@@ -615,7 +615,7 @@ def test_partner_id_izolat_pe_owner(agent):
     partner_id_a_strain = uuid4()  # nu trebuie sa apara niciodata
 
     rows_doar_ale_lui_b = [
-        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b),
+        (contact_b, "Contact B", "CONVERTED", None, None, "partner", NOW, partner_b, None, None, None, None, None),
     ]
 
     with patch("src.agents.contact.contact_agent.get_connection") as mock_get_conn:
