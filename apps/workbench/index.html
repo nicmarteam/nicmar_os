@@ -300,6 +300,52 @@
     <div class="status-line" id="priority-status"></div>
   </section>
 
+  <!-- ZONA PROSPECTARE RELATIONALA — Decizia 46A.
+       NICMAR arata contextul persoanei; liderul decide ce scrie.
+       Fara mesaje generate automat (v1) — contract 46A, §3. -->
+  <section class="panel disabled" id="panel-outreach">
+    <h2><span class="step-no">•</span> Prospectare relațională</h2>
+
+    <div class="category-list" id="outreach-purpose-list">
+      <button class="category-btn" type="button" onclick="selectOutreachPurpose('REFERRAL', this)">🤝 Cer o recomandare</button>
+      <button class="category-btn" type="button" onclick="selectOutreachPurpose('REACTIVATION', this)">🔄 Reactivez o relație</button>
+    </div>
+
+    <div id="outreach-contact-box" class="hidden" style="margin-top:12px;">
+      <p class="status-line">Alege persoana:</p>
+      <div class="category-list" id="outreach-contacts-list"></div>
+    </div>
+
+    <div id="outreach-context-box" class="hidden" style="margin-top:12px;">
+      <div class="variant-card" id="outreach-context-card"></div>
+    </div>
+
+    <div id="outreach-compose-box" class="hidden" style="margin-top:12px;">
+      <p class="status-line">Ton (etichetă pentru istoric — tu decizi ce scrii):</p>
+      <div class="category-list" id="outreach-tone-list">
+        <button class="category-btn" type="button" onclick="selectOutreachTone('CALDA', this)">CALDA</button>
+        <button class="category-btn" type="button" onclick="selectOutreachTone('RELAXATA', this)">RELAXATA</button>
+        <button class="category-btn" type="button" onclick="selectOutreachTone('DIRECTA', this)">DIRECTA</button>
+      </div>
+      <label for="outreach-message-input" style="margin-top:10px;display:block;">Mesajul tău</label>
+      <textarea id="outreach-message-input" placeholder="Scrie mesajul cu cuvintele tale."></textarea>
+      <button id="send-outreach-btn" onclick="sendOutreach()" style="margin-top:8px;">Am trimis mesajul</button>
+    </div>
+
+    <div id="outreach-outcome-box" class="hidden" style="margin-top:14px;">
+      <p class="status-line">Ce răspuns ai primit?</p>
+      <div class="category-list" id="outreach-outcome-list">
+        <button class="category-btn" type="button" onclick="recordOutreachOutcome('QUESTION_ASKED')">💬 A pus o întrebare</button>
+        <button class="category-btn" type="button" onclick="recordOutreachOutcome('HESITATION')">❤️ Ezită</button>
+        <button class="category-btn" type="button" onclick="recordOutreachOutcome('WILL_RESPOND_LATER')">📅 Revine mai târziu</button>
+        <button class="category-btn" type="button" onclick="recordOutreachOutcome('REFERRAL_RECEIVED')">🤝 Mi-a dat o recomandare</button>
+        <button class="category-btn" type="button" onclick="recordOutreachOutcome('POSITIVE_RESPONSE')">✅ A răspuns pozitiv</button>
+      </div>
+    </div>
+
+    <div class="status-line" id="outreach-status"></div>
+  </section>
+
   <!-- ZONA CONTACT & CONVERSATIE — Decizia 34, sectiunea 2.1 -->
   <section class="panel disabled" id="panel-contact">
     <h2><span class="step-no">•</span> Contact și conversație</h2>
@@ -471,6 +517,7 @@
       setPanelEnabled("panel-mission", false);
       setPanelEnabled("panel-performance", false);
       setPanelEnabled("panel-priority", false);
+      setPanelEnabled("panel-outreach", false);
       throw new Error("Sesiunea a expirat sau tokenul e invalid — autentifică-te din nou.");
     }
 
@@ -538,6 +585,7 @@
       setPanelEnabled("panel-mission", true);
       setPanelEnabled("panel-performance", true);
       setPanelEnabled("panel-priority", true);
+      setPanelEnabled("panel-outreach", true);
       await loadContacts();
       await loadPriority();
     } catch (e) {
@@ -1339,6 +1387,156 @@
           " · Vechime: " + Math.round(activity.vechime_seconds) + "s</div>";
         listEl.appendChild(card);
       });
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // ZONA PROSPECTARE RELATIONALA — Decizia 46A.
+  //
+  // Principiu (contract 46A, §3): NICMAR arata contextul persoanei —
+  // cine e, de ce apare acum, ce relatie exista, ce s-a intamplat
+  // ultima data — apoi LIDERUL decide ce scrie. Fara mesaje generate
+  // automat, fara variante hardcodate. Toate datele de context vin din
+  // GET /api/v1/contacts, deja existent — zero backend nou.
+  // ------------------------------------------------------------------
+  let currentOutreachPurpose = null;
+  let currentOutreachContact = null;
+  let currentOutreachTone = null;
+  let currentOutreachId = null;
+
+  function selectOutreachPurpose(purpose, btnEl) {
+    currentOutreachPurpose = purpose;
+    document.querySelectorAll("#outreach-purpose-list .category-btn").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+    btnEl.classList.add("selected");
+    document.getElementById("outreach-contact-box").classList.remove("hidden");
+    document.getElementById("outreach-context-box").classList.add("hidden");
+    document.getElementById("outreach-compose-box").classList.add("hidden");
+    document.getElementById("outreach-outcome-box").classList.add("hidden");
+    document.getElementById("outreach-status").textContent = "";
+    loadOutreachContacts();
+  }
+
+  async function loadOutreachContacts() {
+    const listEl = document.getElementById("outreach-contacts-list");
+    const statusEl = document.getElementById("outreach-status");
+    try {
+      const contacts = await apiFetch("/api/v1/contacts", { method: "GET" });
+      listEl.innerHTML = "";
+      contacts.forEach(function (contact) {
+        const btn = document.createElement("button");
+        btn.className = "category-btn";
+        btn.type = "button";
+        btn.textContent = contact.full_name;
+        btn.onclick = function () { selectOutreachContact(contact, btn); };
+        listEl.appendChild(btn);
+      });
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  function selectOutreachContact(contact, btnEl) {
+    currentOutreachContact = contact;
+    document.querySelectorAll("#outreach-contacts-list .category-btn").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+    btnEl.classList.add("selected");
+    renderOutreachContext(contact);
+    document.getElementById("outreach-context-box").classList.remove("hidden");
+    document.getElementById("outreach-compose-box").classList.remove("hidden");
+  }
+
+  function renderOutreachContext(contact) {
+    const cardEl = document.getElementById("outreach-context-card");
+    const relatie = contact.converted_to === "partner" ? "Partener" : contact.status;
+    const ultimul = contact.last_followup_status
+      ? contact.last_followup_status + (contact.last_followup_at ? " (" + contact.last_followup_at.substring(0, 10) + ")" : "")
+      : "Niciun follow-up înregistrat";
+    cardEl.innerHTML =
+      "<div class=\"label\">" + escapeHtml(contact.full_name) + "</div>" +
+      "<div class=\"text\">De ce apare acum: " + escapeHtml(contact.reason) + "</div>" +
+      "<div class=\"status-line\">Relație: " + escapeHtml(relatie) +
+      " · Ultimul pas: " + escapeHtml(ultimul) + "</div>";
+  }
+
+  function selectOutreachTone(tone, btnEl) {
+    currentOutreachTone = tone;
+    document.querySelectorAll("#outreach-tone-list .category-btn").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+    btnEl.classList.add("selected");
+  }
+
+  async function sendOutreach() {
+    const statusEl = document.getElementById("outreach-status");
+    const messageText = document.getElementById("outreach-message-input").value.trim();
+
+    if (!currentOutreachPurpose || !currentOutreachContact) {
+      statusEl.textContent = "Alege scopul și persoana.";
+      return;
+    }
+    if (!currentOutreachTone) {
+      statusEl.textContent = "Alege tonul.";
+      return;
+    }
+    if (!messageText) {
+      statusEl.textContent = "Scrie mesajul înainte de a-l marca trimis.";
+      return;
+    }
+
+    // OUTREACH_CREATE_PAYLOAD_START
+    const outreachCreatePayload = {
+      contact_id: currentOutreachContact.contact_id,
+      purpose: currentOutreachPurpose,
+      message_text: messageText,
+      tone_used: currentOutreachTone,
+    };
+    // OUTREACH_CREATE_PAYLOAD_END
+
+    try {
+      const outreach = await apiFetch("/api/v1/outreach", {
+        method: "POST",
+        body: JSON.stringify(outreachCreatePayload),
+      });
+      currentOutreachId = outreach.id;
+      statusEl.textContent = "";
+      document.getElementById("outreach-compose-box").classList.add("hidden");
+      document.getElementById("outreach-outcome-box").classList.remove("hidden");
+    } catch (e) {
+      statusEl.textContent = e.message;
+    }
+  }
+
+  async function recordOutreachOutcome(outcome) {
+    const statusEl = document.getElementById("outreach-status");
+
+    if (!currentOutreachId) {
+      statusEl.textContent = "Nu există o intervenție activă.";
+      return;
+    }
+
+    // OUTREACH_OUTCOME_PAYLOAD_START
+    const outreachOutcomePayload = {
+      outcome: outcome,
+    };
+    // OUTREACH_OUTCOME_PAYLOAD_END
+
+    try {
+      const result = await apiFetch(`/api/v1/outreach/${currentOutreachId}/outcome`, {
+        method: "POST",
+        body: JSON.stringify(outreachOutcomePayload),
+      });
+      document.getElementById("outreach-outcome-box").classList.add("hidden");
+      if (result.conversation_id) {
+        statusEl.textContent = "Conversație deschisă — continuă din panoul Contact.";
+      } else {
+        statusEl.textContent = "Rezultat înregistrat. Continuă manual, dacă e cazul.";
+      }
+      currentOutreachId = null;
     } catch (e) {
       statusEl.textContent = e.message;
     }
