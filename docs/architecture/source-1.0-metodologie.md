@@ -53,6 +53,20 @@ sunt altele când fac mai multe."*
 **Rata reală, confirmată**: din ~20 cereri, se aprobă **2-4**. De aceea
 volumul contează — *"trebuie făcute multe."*
 
+**După acceptare — limitare reală a platformei, confirmată:**
+
+> *"Nu știu dacă acceptă cererea. Eu nu văd decât foarte târziu dacă a
+> acceptat-o, pentru că nu întotdeauna Facebook îmi spune."*
+
+Consecință practică: acceptarea **nu e un eveniment observabil**.
+Owner-ul constată prietenia **abia când persoana interacționează cu
+postările lui**. Dacă totuși vede acceptarea, merge în privat și
+mulțumește — dar recunoaște explicit: *"aici este discutabil."*
+
+**Implicație pentru orice sistem viitor**: nu se poate urmări
+"cereri acceptate" ca metrică — nu există semnal fiabil. Singurul
+semnal real rămâne **interacțiunea cu conținutul** (Etapa 4).
+
 ### Etapa 3 — CONȚINUT
 
 Canale: **Reels** (ajung dincolo de audiența proprie — singurul canal
@@ -151,6 +165,17 @@ readuse în față la momentul propunerii.
 Prospect **nu** e un status atribuit de sistem după calificare — e
 momentul în care liderul **începe conversația de descoperire**.
 
+**Criteriul concret, offline** (clarificare ulterioară a owner-ului):
+
+> *"Dacă întâlnesc 5 persoane noi, scopul meu este să mă conectez cu
+> ele. Dacă reușesc să mă conectez și să le iau un număr de telefon,
+> pentru mine acele persoane sunt viitori prospecți."*
+
+Deci: **numărul de telefon obținut = pragul practic**, chiar dacă
+n-a existat încă o conversație de descoperire. Motivul dat:
+*"mă pot conecta cu ei atât pe WhatsApp, cât și prin a-i suna
+direct"* — există un canal real de continuare.
+
 ---
 
 ## 6. Cascada de conversie — regula anti-abandon
@@ -208,20 +233,58 @@ cel de conversație, audiența rămâne pasivă.
 
 ---
 
-## 8. Ce rămâne nedefinit (goluri oneste)
+## 8. Onboarding-ul partenerului nou — ordinea confirmată
 
-1. **Alegerea temelor de reels + construcția hook-ului** — indicat
-   explicit ca fiind de construit, nu practică existentă (§2, Etapa 3)
-2. **Ordinea de învățare pentru un partener nou** — ce învață primul:
-   să găsească oameni, sau produsul? Întrebare rămasă fără răspuns
-3. **Cine decide intrarea în Black Box** — partenerul manual, sau
+Răspuns explicit al owner-ului, care contrazice ipoteza inițială
+("învață întâi să găsească oameni"):
+
+> **"Partenerul nou, la început, nu trebuie să facă absolut nimic.
+> Pentru că liderul este cel care îl ajută."**
+
+Ordinea reală:
+
+| Pas | Ce se întâmplă | Cine face |
+|---|---|---|
+| 1 | **Vise, obiective, scopuri** — stabilite împreună | Liderul conduce |
+| 2 | **Plan** — cum și le poate obține | Liderul construiește |
+| 3 | **Familiarizare cu produsele** | Partenerul |
+| 4 | **Folosirea produselor** | Partenerul |
+
+**Formularea finală, dată explicit:**
+
+> *"Dacă ar trebui să spun concret, primul lucru pe care îl învață
+> partenerul nou este să folosească produse. Pentru că fără produse nu
+> va avea niciodată o afacere."*
+
+**Consecință importantă pentru NICMAR**: prospectarea (SOURCE) **nu e
+prima competență** predată unui partener nou. E precedată de vis →
+plan → produs. Un sistem care ar pune un partener nou direct să
+prospecteze ar contrazice metodologia.
+
+## 9. Ce rămâne nedefinit (goluri oneste)
+
+1. **Construcția hook-ului pentru reels** — direcția e clarificată
+   parțial (vezi mai jos), dar tehnica de a opri scroll-ul rămâne
+   nedefinită
+2. **Cine decide intrarea în Black Box** — partenerul manual, sau
    sistemul propune? Nedecis
-4. **Cum se măsoară eficiența unei metode de SOURCE** — dacă va fi
+3. **Cum se măsoară eficiența unei metode de SOURCE** — dacă va fi
    nevoie de un KPI, trece prin `kpi-truthfulness-principle.md`
+
+### Notă — teme de reels, clarificare parțială
+
+Owner-ul a precizat: reels-urile sunt filmulețe care **scot conținutul
+în afara cercului de prieteni**, iar temele trebuie să **rezolve o
+nevoie concretă a avatarului**. Direcția de lucru indicată: cercetare
+de cuvinte și expresii-cheie căutate de avatar (Facebook, TikTok,
+Google) → identificarea nevoilor reale → teme derivate din ele.
+
+Răspunsul owner-ului s-a întrerupt înainte de a detalia metoda
+completă — **rămâne de completat**, nu se presupune.
 
 ---
 
-## 9. Ce urmează
+## 10. Ce urmează
 
 Acest document e **business truth**, nu contract. Pasul următor:
 identificarea primei piese implementabile din acest mecanism, cu
