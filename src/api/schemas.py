@@ -173,6 +173,13 @@ class CreateContactRequest(BaseModel):
     email: Optional[str] = None
     source: Optional[str] = None
     metadata: Optional[dict] = None
+    # Decizia 47 (Competența 18) — toate opționale, contactele fără
+    # aceste informații rămân perfect valide.
+    relationship_category: Optional[str] = None
+    relationship_level: Optional[str] = None
+    last_contact_approx: Optional[str] = None
+    significant_context: Optional[str] = None
+    perceived_interest: Optional[str] = None
 
 
 class ContactResponse(BaseModel):
@@ -184,6 +191,12 @@ class ContactResponse(BaseModel):
     status: str
     source: Optional[str]
     metadata: dict
+    # Decizia 47 (Competența 18)
+    relationship_category: Optional[str] = None
+    relationship_level: Optional[str] = None
+    last_contact_approx: Optional[str] = None
+    significant_context: Optional[str] = None
+    perceived_interest: Optional[str] = None
 
 
 # ------------------------------------------------------------------
@@ -229,6 +242,13 @@ class ContactSummaryResponse(BaseModel):
     pip: Optional[float]
     reason: str
     partner_id: Optional[UUID]
+    # Decizia 47 (Competența 18) — expuse in lista, ca sa poata alimenta
+    # direct 46A (Prospectare Relationala) si restul sistemului.
+    relationship_category: Optional[str] = None
+    relationship_level: Optional[str] = None
+    last_contact_approx: Optional[str] = None
+    significant_context: Optional[str] = None
+    perceived_interest: Optional[str] = None
 
 
 # ------------------------------------------------------------------
