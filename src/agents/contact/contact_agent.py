@@ -98,6 +98,11 @@ class ContactSummary:
     pip: Optional[float]
     reason: str
     partner_id: Optional[UUID]
+    relationship_category: Optional[str] = None
+    relationship_level: Optional[str] = None
+    last_contact_approx: Optional[str] = None
+    significant_context: Optional[str] = None
+    perceived_interest: Optional[str] = None
 
 
 def _priority_group(
@@ -200,6 +205,11 @@ class ContactAgent:
             converted_to,
             _updated_at,
             partner_id,
+            relationship_category,
+            relationship_level,
+            last_contact_approx,
+            significant_context,
+            perceived_interest,
         ) in sorted_rows:
             partner_scores = scores_by_partner.get(partner_id, {}) if converted_to == "partner" else {}
             result.append(
@@ -214,6 +224,11 @@ class ContactAgent:
                     pip=partner_scores.get("PIP"),
                     reason=_reason(last_followup_at, last_followup_status),
                     partner_id=partner_id,
+                    relationship_category=relationship_category,
+                    relationship_level=relationship_level,
+                    last_contact_approx=last_contact_approx,
+                    significant_context=significant_context,
+                    perceived_interest=perceived_interest,
                 )
             )
         return result
@@ -232,7 +247,12 @@ class ContactAgent:
             contract nu specifică o ordine secundară, deci `tie_break`
             rămâne `0.0` (ordinea de intrare se păstrează, sortare stabilă).
         """
-        _, _, _, last_followup_at, last_followup_status, _, updated_at, _partner_id = row
+        # Decizia 47: tuplul are acum 13 elemente (5 campuri de relatie
+        # adaugate la final). Folosim indici pentru cele 3 valori de care
+        # avem nevoie, nu unpacking rigid — robust la extinderi viitoare.
+        last_followup_at = row[3]
+        last_followup_status = row[4]
+        updated_at = row[6]
         group = _priority_group(last_followup_at, last_followup_status)
         tie_break = -updated_at.timestamp() if group == 2 else 0.0
         return group, tie_break
@@ -264,7 +284,12 @@ class ContactAgent:
                     ELSE NULL
                 END,
                 c.updated_at,
-                p.id
+                p.id,
+                c.relationship_category,
+                c.relationship_level,
+                c.last_contact_approx,
+                c.significant_context,
+                c.perceived_interest
             FROM contacts c
             LEFT JOIN LATERAL (
                 SELECT scheduled_at, status
