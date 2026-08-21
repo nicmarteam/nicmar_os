@@ -59,5 +59,11 @@ jobs:
       - name: Rulare migrație — coloane răspuns obiecție
         run: psql "$DATABASE_URL" -f migrations/004_objection_response_columns.sql
 
+      - name: Rulare migrație — outreach relațional
+        run: psql "$DATABASE_URL" -f migrations/005_outreach_relational.sql
+
+      - name: Rulare migrație — câmpuri de relație
+        run: psql "$DATABASE_URL" -f migrations/006_relationship_fields.sql
+
       - name: Rulare pytest — unitare + integrare + securitate + PostgreSQL real
         run: pytest -v
