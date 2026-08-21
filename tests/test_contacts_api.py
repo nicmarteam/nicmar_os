@@ -262,3 +262,79 @@ def test_contact_creat_de_a_nu_e_accesibil_de_b_prin_conversation_engine(client)
 
     with pytest.raises(ConversationAccessDeniedError):
         conv_engine.get_or_create_conversation(owner_id=owner_id_b, contact_id=contact_id_a)
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 47 (RED, 20 august 2026) — campurile de relatie prin HTTP.
+# Sursa: 47-lista-relatii-contract.md, criteriile 6-8.
+# ----------------------------------------------------------------------
+
+
+def test_post_contact_cu_campuri_de_relatie_returneaza_201(client):
+    """Contract 47, criteriul 6."""
+    session = _register_and_login(client, "contact-relatie-create")
+
+    r = client.post(
+        "/api/v1/contacts",
+        json={
+            "full_name": "Maria Prietena",
+            "relationship_category": "PRIETENI",
+            "relationship_level": "BUNA",
+            "last_contact_approx": "SAPTAMANA_ACEASTA",
+            "significant_context": "Ne-am vazut la o cafea.",
+            "perceived_interest": "PROBABIL",
+        },
+        headers=session["headers"],
+    )
+
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["relationship_category"] == "PRIETENI"
+    assert body["relationship_level"] == "BUNA"
+    assert body["last_contact_approx"] == "SAPTAMANA_ACEASTA"
+    assert body["significant_context"] == "Ne-am vazut la o cafea."
+    assert body["perceived_interest"] == "PROBABIL"
+
+
+def test_post_contact_categorie_invalida_returneaza_400(client):
+    """Contract 47, criteriul 7 — validare la nivel de aplicatie."""
+    session = _register_and_login(client, "contact-relatie-invalid")
+
+    r = client.post(
+        "/api/v1/contacts",
+        json={"full_name": "X", "relationship_category": "COLEGI_DE_LICEU"},
+        headers=session["headers"],
+    )
+
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_VALUE"
+
+
+def test_get_contacts_expune_campurile_de_relatie(client):
+    """
+    Contract 47, criteriul 8: campurile apar in GET /contacts, ca sa
+    poata alimenta direct 46A (Prospectare Relationala) si restul
+    sistemului — beneficiul principal al deciziei de a extinde Contact
+    in loc sa cream Relationship.
+    """
+    session = _register_and_login(client, "contact-relatie-list")
+    r_create = client.post(
+        "/api/v1/contacts",
+        json={
+            "full_name": "Ana Colega",
+            "relationship_category": "COLEGI",
+            "relationship_level": "OCAZIONALA",
+            "perceived_interest": "NU_STIU_INCA",
+        },
+        headers=session["headers"],
+    )
+    assert r_create.status_code == 201
+    contact_id = r_create.json()["id"]
+
+    r = client.get("/api/v1/contacts", headers=session["headers"])
+
+    assert r.status_code == 200
+    body = next(c for c in r.json() if c["contact_id"] == contact_id)
+    assert body["relationship_category"] == "COLEGI"
+    assert body["relationship_level"] == "OCAZIONALA"
+    assert body["perceived_interest"] == "NU_STIU_INCA"
