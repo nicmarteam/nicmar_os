@@ -81,12 +81,16 @@ pozitivă, depășirea liniei zero.
 Ofertă la final de live: *"Creez o echipă nouă — dacă ești interesat,
 te invit, hai să stăm de vorbă."*
 
-> ⚠️ **GOL IDENTIFICAT, nu metodă**: cum se aleg temele de reels și
-> cum se construiește un hook care oprește scroll-ul — owner-ul a
-> indicat explicit că aceasta e o capacitate **de construit**
-> (cercetare de cuvinte/expresii-cheie căutate de avatar pe
-> Facebook/TikTok/Google → nevoi → teme), nu o practică deja
-> existentă. Nu se documentează ca metodă validată.
+**Rolul specific al reels-urilor** (clarificat de owner): sunt
+filmulețe care **scot conținutul în afara cercului de prieteni** —
+singurul canal care aduce oameni complet noi, spre deosebire de
+postări/story/live, care ajung la audiența deja construită.
+
+**Regula de temă**: temele trebuie să **rezolve o nevoie concretă a
+avatarului**, nu să prezinte afacerea.
+
+> ⚠️ Tehnica de construcție a hook-ului (ce oprește scroll-ul) rămâne
+> **nedefinită** — vezi §9.
 
 ### Etapa 4 — SEMNAL (citirea reacției)
 
@@ -271,16 +275,16 @@ prospecteze ar contrazice metodologia.
 3. **Cum se măsoară eficiența unei metode de SOURCE** — dacă va fi
    nevoie de un KPI, trece prin `kpi-truthfulness-principle.md`
 
-### Notă — teme de reels, clarificare parțială
+### Notă — hook pentru reels
 
-Owner-ul a precizat: reels-urile sunt filmulețe care **scot conținutul
-în afara cercului de prieteni**, iar temele trebuie să **rezolve o
-nevoie concretă a avatarului**. Direcția de lucru indicată: cercetare
-de cuvinte și expresii-cheie căutate de avatar (Facebook, TikTok,
-Google) → identificarea nevoilor reale → teme derivate din ele.
+Rolul și regula de temă sunt documentate în §2, Etapa 3. Ce rămâne
+nedefinit e **tehnica**: cum se construiește concret un hook care
+oprește scroll-ul.
 
-Răspunsul owner-ului s-a întrerupt înainte de a detalia metoda
-completă — **rămâne de completat**, nu se presupune.
+Direcția de lucru indicată de owner: cercetare de cuvinte și
+expresii-cheie căutate de avatar (Facebook, TikTok, Google) →
+identificarea nevoilor reale → teme derivate din ele. Metoda completă
+nu a fost detaliată — **rămâne de completat**, nu se presupune.
 
 ---
 
