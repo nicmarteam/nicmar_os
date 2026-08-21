@@ -12,7 +12,9 @@ from uuid import uuid4
 
 import pytest
 
-from src.engines.contact.contact_engine import Contact, ContactEngine
+from src.engines.contact.contact_engine import (
+    Contact, ContactEngine, InvalidRelationshipValueError,
+)
 
 
 def _make_cursor(fetchone_result):
@@ -162,3 +164,79 @@ def test_create_contact_emite_event_contact_created(engine):
         args = mock_emit.call_args[0]
         assert args[0] == "ContactCreated"
         assert args[1] == contact_id
+
+
+# ----------------------------------------------------------------------
+# DECIZIA 47 (RED, 20 august 2026) — Construirea Listei de Relatii
+# (Competenta 18). Sursa: 47-lista-relatii-contract.md, sectiunea 6.
+#
+# Regula centrala: NU se creeaza entitatea Relationship. Cele 5 campuri
+# devin atribute ale Contact-ului deja existent — o persoana, un traseu.
+# ----------------------------------------------------------------------
+
+
+def test_create_contact_accepta_campurile_de_relatie(engine):
+    """Contract 47, criteriul 1: toate 5 campurile ajung in INSERT."""
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
+         patch.object(ContactEngine, "_emit_event"):
+        mock_cur = _make_cursor(
+            (contact_id, owner_id, "Maria", None, None, "NEW", None, {}),
+        )
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        engine.create_contact(
+            owner_id=owner_id,
+            full_name="Maria",
+            relationship_category="PRIETENI",
+            relationship_level="BUNA",
+            last_contact_approx="LUNA_ACEASTA",
+            significant_context="Si-a schimbat jobul recent.",
+            perceived_interest="PROBABIL",
+        )
+
+        executed_params = mock_cur.execute.call_args[0][1]
+        assert "PRIETENI" in executed_params
+        assert "BUNA" in executed_params
+        assert "LUNA_ACEASTA" in executed_params
+        assert "Si-a schimbat jobul recent." in executed_params
+        assert "PROBABIL" in executed_params
+
+
+def test_create_contact_fara_campuri_de_relatie_ramane_valid(engine):
+    """
+    Contract 47, criteriul 2 — REGRESIE: semnatura veche functioneaza
+    neschimbata, campurile noi devin None. Zero breaking change pentru
+    cele ~500 de teste existente.
+    """
+    owner_id = uuid4()
+    contact_id = uuid4()
+
+    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
+         patch.object(ContactEngine, "_emit_event"):
+        mock_cur = _make_cursor(
+            (contact_id, owner_id, "Ion", None, None, "NEW", None, {}),
+        )
+        mock_get_conn.return_value = _make_conn(mock_cur)
+
+        contact = engine.create_contact(owner_id=owner_id, full_name="Ion")
+
+        assert contact.full_name == "Ion"
+        executed_params = mock_cur.execute.call_args[0][1]
+        assert executed_params.count(None) >= 5
+
+
+def test_create_contact_categorie_invalida_ridica_eroare(engine):
+    """
+    Contract 47, criteriul 3: validare la nivel de aplicatie, INAINTE de
+    DB (tipar identic InvalidDiagnosticTypeError de la Partner) — nu se
+    bazeaza doar pe CHECK-ul din schema ca plasa de siguranta.
+    """
+    with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn:
+        with pytest.raises(InvalidRelationshipValueError):
+            engine.create_contact(
+                owner_id=uuid4(), full_name="X", relationship_category="COLEGI_DE_LICEU",
+            )
+        mock_get_conn.assert_not_called()
