@@ -61,14 +61,16 @@ ipoteze până la bucla de validare din acel document.
 
 ## §3 — What SOURCE Means
 
-> SOURCE nu înseamnă "recrutare". SOURCE înseamnă crearea continuă a
-> fluxului de persoane noi și transformarea lor în prospecți.
+> SOURCE este stratul de generare și captare a fluxului de persoane
+> noi până la statutul de prospect. Recrutarea începe cu lucrul
+> prospectului și continuă prin `CONNECT → DISCOVER → INVITE →
+> PRESENT → CLIENT/PARTNER`.
 
-Recrutarea propriu-zisă (`CONNECT → DISCOVER → INVITE → PRESENT →
-CLIENT/PARTNER`) începe după ce prospectul există deja și rămâne în
-afara scope-ului acestei decizii — acolo se suprapune cu motoare deja
-existente (`CustomerRelationshipEngine`, `PartnerRelationshipEngine`,
-`ObjectionEngine`).
+SOURCE nu este separat de recrutare — **o alimentează**. Fără flux
+continuu de persoane noi, etapele de recrutare lucrează pe aceeași
+bază de oameni, care se epuizează. Delimitarea de mai sus separă unde
+începe munca de fiecare tip (generare de flux vs. lucrul propriu-zis
+al prospectului), nu declară SOURCE ca fiind în afara recrutării.
 
 **Ideea centrală a acestei decizii:** SOURCE e tratat ca necesitate de
 business înainte de a fi tratat ca arhitectură software. Asta previne
@@ -119,14 +121,13 @@ dacă și cum sistemul o poate sprijini — nu dacă o poate înlocui.
 
 ## §6 — Relationship to MVP-ENGINE-001
 
-SOURCE **nu modifică** scope-ul MVP-ENGINE-001 (cele 6 motoare
-confirmate: `MissionEngine`, `FollowUpEngine`,
-`CustomerRelationshipEngine`, `PartnerRelationshipEngine`,
-`ObjectionEngine` și al șaselea din grupul deja livrat — v.
-`06-harta-motoare-tehnice.md`). Nu se declară aici "Motorul 0", nici
-vreo poziție tehnică definitivă — poziționarea (motor separat, modul,
-capability layer) se stabilește **după** audit arhitectural, nu prin
-presupunere în acest document.
+SOURCE **nu modifică** scope-ul MVP-ENGINE-001 și nu introduce niciun
+motor nou în MVP (v. `06-harta-motoare-tehnice.md` pentru lista
+curentă a celor 6 motoare confirmate — neenumerate aici, ca să nu
+riscăm o listă neactualizată sau neverificată în acest document). Nu
+se declară aici "Motorul 0", nici vreo poziție tehnică definitivă —
+poziționarea (motor separat, modul, capability layer) se stabilește
+**după** audit arhitectural, nu prin presupunere în acest document.
 
 ---
 
