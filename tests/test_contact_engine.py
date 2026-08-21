@@ -46,7 +46,7 @@ def test_create_contact_status_este_hardcodat_new_nu_din_parametru(engine):
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
          patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
-            (contact_id, owner_id, "Ion Popescu", None, None, "NEW", None, {}),
+            (contact_id, owner_id, "Ion Popescu", None, None, "NEW", None, {}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -64,7 +64,7 @@ def test_create_contact_returneaza_contact_complet(engine):
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn:
         mock_cur = _make_cursor(
             (contact_id, owner_id, "Maria Ionescu", "0722000000", "maria@test.ro",
-             "NEW", "facebook", {"nota": "prieten"}),
+             "NEW", "facebook", {"nota": "prieten"}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -87,7 +87,7 @@ def test_create_contact_campuri_optionale_none_by_default(engine):
 
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn:
         mock_cur = _make_cursor(
-            (contact_id, owner_id, "Test Minim", None, None, "NEW", None, {}),
+            (contact_id, owner_id, "Test Minim", None, None, "NEW", None, {}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -106,14 +106,16 @@ def test_create_contact_metadata_none_devine_dict_gol(engine):
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
          patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
-            (contact_id, owner_id, "Test", None, None, "NEW", None, {}),
+            (contact_id, owner_id, "Test", None, None, "NEW", None, {}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
         engine.create_contact(owner_id=owner_id, full_name="Test", metadata=None)
 
         executed_params = mock_cur.execute.call_args[0][1]
-        json_param = executed_params[-1]  # ultimul parametru = metadata, invelit in Json()
+        # Decizia 47: metadata nu mai e ultimul parametru (au fost adaugate
+        # 5 campuri de relatie dupa el). Il gasim prin tip, nu prin pozitie.
+        json_param = next(p for p in executed_params if hasattr(p, "obj"))
         assert json_param.obj == {}  # psycopg.types.json.Json pastreaza obiectul original in .obj
 
 
@@ -124,7 +126,7 @@ def test_create_contact_owner_id_folosit_exact_cel_transmis(engine):
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
          patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
-            (contact_id, owner_id, "Test", None, None, "NEW", None, {}),
+            (contact_id, owner_id, "Test", None, None, "NEW", None, {}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -154,7 +156,7 @@ def test_create_contact_emite_event_contact_created(engine):
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
          patch.object(ContactEngine, "_emit_event") as mock_emit:
         mock_cur = _make_cursor(
-            (contact_id, owner_id, "Test Event", None, None, "NEW", None, {}),
+            (contact_id, owner_id, "Test Event", None, None, "NEW", None, {}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -183,7 +185,7 @@ def test_create_contact_accepta_campurile_de_relatie(engine):
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
          patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
-            (contact_id, owner_id, "Maria", None, None, "NEW", None, {}),
+            (contact_id, owner_id, "Maria", None, None, "NEW", None, {}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
@@ -217,7 +219,7 @@ def test_create_contact_fara_campuri_de_relatie_ramane_valid(engine):
     with patch("src.engines.contact.contact_engine.get_connection") as mock_get_conn, \
          patch.object(ContactEngine, "_emit_event"):
         mock_cur = _make_cursor(
-            (contact_id, owner_id, "Ion", None, None, "NEW", None, {}),
+            (contact_id, owner_id, "Ion", None, None, "NEW", None, {}, None, None, None, None, None),
         )
         mock_get_conn.return_value = _make_conn(mock_cur)
 
