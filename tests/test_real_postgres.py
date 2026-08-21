@@ -1054,6 +1054,58 @@ class TestContactEngineOnRealPostgres:
                 row = cur.fetchone()
         assert row == ("ContactCreated", "contact")
 
+    # ------------------------------------------------------------------
+    # DECIZIA 47 (RED) — campurile de relatie (Competenta 18), pe
+    # PostgreSQL real. Sursa: 47-lista-relatii-contract.md, criteriile 4-5.
+    # ------------------------------------------------------------------
+
+    def test_campurile_de_relatie_persistate_real(self):
+        """Contract 47, criteriul 4: toate 5 campurile ajung efectiv in DB."""
+        owner_id = _create_user("contact-relatie")
+        engine = ContactEngine()
+
+        contact = engine.create_contact(
+            owner_id=owner_id,
+            full_name="Maria Relatie",
+            relationship_category="FAMILIE",
+            relationship_level="FOARTE_APROPIATA",
+            last_contact_approx="ASTAZI",
+            significant_context="Vorbim des.",
+            perceived_interest="FOARTE_DESCHISA",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT relationship_category, relationship_level, last_contact_approx, "
+                    "significant_context, perceived_interest FROM contacts WHERE id = %s",
+                    (contact.id,),
+                )
+                row = cur.fetchone()
+        assert row == (
+            "FAMILIE", "FOARTE_APROPIATA", "ASTAZI", "Vorbim des.", "FOARTE_DESCHISA",
+        )
+
+    def test_contact_fara_campuri_de_relatie_are_null(self):
+        """
+        Contract 47, criteriul 5: coloanele noi accepta NULL — contactele
+        create fara aceste informatii raman perfect valide.
+        """
+        owner_id = _create_user("contact-fara-relatie")
+        engine = ContactEngine()
+
+        contact = engine.create_contact(owner_id=owner_id, full_name="Ion Simplu")
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT relationship_category, relationship_level, last_contact_approx, "
+                    "significant_context, perceived_interest FROM contacts WHERE id = %s",
+                    (contact.id,),
+                )
+                row = cur.fetchone()
+        assert row == (None, None, None, None, None)
+
 
 class TestConversationEngineOnRealPostgres:
     """
