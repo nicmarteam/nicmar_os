@@ -26,6 +26,7 @@ from src.engines.partner.partner_engine import (
 )
 from src.engines.objection.objection_engine import ObjectionNotFoundError
 from src.engines.conversation.conversation_engine import ConversationAccessDeniedError
+from src.engines.contact.contact_engine import InvalidRelationshipValueError
 from src.engines.outreach.outreach_engine import (
     OutreachAccessDeniedError, OutcomeAlreadyRecordedError,
     InvalidPurposeError, InvalidToneError, InvalidOutcomeError,
@@ -74,6 +75,9 @@ CONFIRMATION_REQUIRED_ERRORS = (
 # de stare, sunt valori de enum invalide pe câmpuri noi: purpose/tone/outcome).
 INVALID_VALUE_ERRORS = (
     InvalidPurposeError, InvalidToneError, InvalidOutcomeError,
+    # Decizia 47 — campurile de relatie (Competenta 18), aceeasi categorie
+    # semantica: valoare de enum invalida, nu tranzitie de stare.
+    InvalidRelationshipValueError,
 )
 
 
