@@ -65,5 +65,8 @@ jobs:
       - name: Rulare migrație — câmpuri de relație
         run: psql "$DATABASE_URL" -f migrations/006_relationship_fields.sql
 
+      - name: Rulare migrație — invite
+        run: psql "$DATABASE_URL" -f migrations/007_invite.sql
+
       - name: Rulare pytest — unitare + integrare + securitate + PostgreSQL real
         run: pytest -v
