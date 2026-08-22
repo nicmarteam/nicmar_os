@@ -38,6 +38,9 @@ from src.engines.conversation.conversation_engine import (
 from src.engines.outreach.outreach_engine import (
     OutreachEngine, OutreachAccessDeniedError, OutcomeAlreadyRecordedError,
 )
+from src.engines.invite.invite_engine import (
+    InviteEngine, InviteAccessDeniedError, InviteOutcomeAlreadyRecordedError,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -1395,3 +1398,160 @@ class TestOutreachEngineOnRealPostgres:
 
         with pytest.raises(OutreachAccessDeniedError):
             engine.record_outcome(owner_id=owner_a, outreach_id=outreach_b.id, outcome="HESITATION")
+
+
+class TestInviteEngineOnRealPostgres:
+    """
+    Teste RED pe PostgreSQL real — Decizia 48,
+    docs/architecture/48-invite-contract.md.
+    """
+
+    def _create_contact(self, owner_id):
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO contacts (owner_id, full_name, status) "
+                    "VALUES (%s, %s, 'ACTIVE') RETURNING id",
+                    (owner_id, "Contact Test Invite"),
+                )
+                return cur.fetchone()[0]
+
+    def test_creeaza_invitatie_pe_postgres_real(self):
+        owner_id = _create_user("invite-create")
+        contact_id = self._create_contact(owner_id)
+        engine = InviteEngine()
+
+        invitation = engine.create_invitation(
+            owner_id=owner_id, contact_id=contact_id, frame="ZOOM",
+            purpose="OPORTUNITATE", message_text="Vrei sa vorbim 10 minute?",
+            tone_used="DIRECTA",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT owner_id, contact_id, frame, purpose, tone_used "
+                    "FROM invitations WHERE id = %s",
+                    (invitation.id,),
+                )
+                row = cur.fetchone()
+        assert row == (owner_id, contact_id, "ZOOM", "OPORTUNITATE", "DIRECTA")
+
+    def test_evenimentul_invite_sent_e_scris_in_events(self):
+        owner_id = _create_user("invite-event")
+        contact_id = self._create_contact(owner_id)
+        engine = InviteEngine()
+
+        invitation = engine.create_invitation(
+            owner_id=owner_id, contact_id=contact_id, frame="CAFEA",
+            purpose="CONVERSATIE_PLACUTA", message_text="x", tone_used="CALDA",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT event_name, target_object FROM events WHERE target_object_id = %s",
+                    (invitation.id,),
+                )
+                row = cur.fetchone()
+        assert row == ("InviteSent", "invitation")
+
+    def test_accepted_nu_creeaza_meeting_pe_postgres_real(self):
+        """Contract 48 §6.B, verificat cap-coada: zero randuri in meetings."""
+        owner_id = _create_user("invite-accepted")
+        contact_id = self._create_contact(owner_id)
+        engine = InviteEngine()
+
+        invitation = engine.create_invitation(
+            owner_id=owner_id, contact_id=contact_id, frame="APEL",
+            purpose="IDEE_NOUA", message_text="x", tone_used="RELAXATA",
+        )
+        result = engine.record_outcome(
+            owner_id=owner_id, invitation_id=invitation.id, outcome="ACCEPTED",
+        )
+
+        assert result.meeting_id is None
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM meetings WHERE source_invitation_id = %s",
+                    (invitation.id,),
+                )
+                count = cur.fetchone()[0]
+        assert count == 0
+
+    def test_schedule_meeting_creeaza_meeting_legat_de_invitatie(self):
+        """Contract 48 §6.B: Meeting apare DOAR dupa programare explicita."""
+        owner_id = _create_user("invite-schedule")
+        contact_id = self._create_contact(owner_id)
+        engine = InviteEngine()
+
+        invitation = engine.create_invitation(
+            owner_id=owner_id, contact_id=contact_id, frame="ZOOM",
+            purpose="OPORTUNITATE", message_text="x", tone_used="CALDA",
+        )
+        engine.record_outcome(
+            owner_id=owner_id, invitation_id=invitation.id, outcome="ACCEPTED",
+        )
+        meeting = engine.schedule_meeting(
+            owner_id=owner_id, invitation_id=invitation.id,
+            title="Zoom 10 minute", scheduled_at="2026-09-01T18:00:00+03:00",
+        )
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT source_invitation_id, status FROM meetings WHERE id = %s",
+                    (meeting.id,),
+                )
+                row = cur.fetchone()
+        assert row == (invitation.id, "SCHEDULED")
+
+    def test_al_doilea_outcome_esueaza_la_nivel_de_db(self):
+        """Cardinalitate 0..1 garantata prin UNIQUE, nu doar prin cod."""
+        owner_id = _create_user("invite-unique")
+        contact_id = self._create_contact(owner_id)
+        engine = InviteEngine()
+
+        invitation = engine.create_invitation(
+            owner_id=owner_id, contact_id=contact_id, frame="CAFEA",
+            purpose="EXPERIENTA", message_text="x", tone_used="CALDA",
+        )
+        engine.record_outcome(
+            owner_id=owner_id, invitation_id=invitation.id, outcome="POSTPONED",
+        )
+
+        with pytest.raises(InviteOutcomeAlreadyRecordedError):
+            engine.record_outcome(
+                owner_id=owner_id, invitation_id=invitation.id, outcome="ACCEPTED",
+            )
+
+    def test_owner_b_nu_poate_inregistra_outcome_pe_invitatia_lui_a(self):
+        owner_a = _create_user("invite-owner-a")
+        owner_b = _create_user("invite-owner-b")
+        contact_a = self._create_contact(owner_a)
+        engine = InviteEngine()
+
+        invitation_a = engine.create_invitation(
+            owner_id=owner_a, contact_id=contact_a, frame="CAFEA",
+            purpose="IDEE_NOUA", message_text="x", tone_used="CALDA",
+        )
+
+        with pytest.raises(InviteAccessDeniedError):
+            engine.record_outcome(
+                owner_id=owner_b, invitation_id=invitation_a.id, outcome="ACCEPTED",
+            )
+
+    def test_meetings_status_invalid_respins_de_db(self):
+        """Contract 48 §6.A: CHECK constraint nou pe meetings.status."""
+        owner_id = _create_user("invite-meeting-status")
+        contact_id = self._create_contact(owner_id)
+
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO meetings (owner_id, contact_id, title, scheduled_at, status) "
+                        "VALUES (%s, %s, 'X', clock_timestamp(), 'INVENTAT')",
+                        (owner_id, contact_id),
+                    )
