@@ -91,38 +91,99 @@ Continuare), deja construit și validat:
 - `sent_at`
 
 **`invitation_outcomes`** (reacția, 0..1 per invitație, `UNIQUE`):
-- `outcome`: `ACCEPTED`, `QUESTION_ASKED`, `HESITATION`,
-  `POSTPONED`, `DECLINED`
-- Toate 5 derivate din Pasul 8 al sursei; `DECLINED` **adăugat** —
-  sursa nu-l enumeră explicit, dar metodologia reală îl cere
-  (cascada afacere→produs→recomandare→black box presupune un "nu")
+- `outcome`: `ACCEPTED`, `POSTPONED`, `QUESTION_ASKED`,
+  `OBJECTION`, `DECLINED`
+- Primele 4 derivate din Pasul 8 al sursei; `DECLINED` **adăugat
+  explicit** — sursa nu-l enumeră, dar metodologia reală îl cere
+  (un "nu" trebuie să poată fi înregistrat)
 
 **Legătura cu `meetings`**: doar pentru `ACCEPTED`. Coloană nouă,
 aditivă: `meetings.source_invitation_id` (tipar identic
 `conversations.source_outreach_id` de la Decizia 46).
 
-## 6. Puncte deschise — necesită decizia owner-ului
+## 6. Cele 4 decizii — ÎNGHEȚATE
 
-**A. `meetings.status` nu are `CHECK` constraint** — singura coloană
-de stare din toată schema fără valori restricționate. Ce valori sunt
-permise? (`SCHEDULED` e default; mai există `HELD`, `CANCELLED`,
-`NO_SHOW`?) Sau rămâne liber în v1?
+### Principiul central, înghețat
 
-**B. Crearea `Meeting` la `ACCEPTED` — automată sau manuală?**
-Problema: la momentul înregistrării outcome-ului, liderul poate să nu
-știe încă data exactă. `meetings.scheduled_at` e `NOT NULL`. Deci:
-(a) sistemul cere data odată cu outcome-ul, (b) `Meeting` se creează
-separat, ulterior, (c) `ACCEPTED` doar semnalează, fără `Meeting`
-automat.
+> **INVITE este evenimentul de business. MEETING este consecința
+> programată a unei invitații acceptate.**
 
-**C. Generarea celor 3 variante de mesaj** — aceeași situație ca la
-46A: backend-ul nu generează text. Liderul scrie, alege doar tonul?
-(recomandat, consecvent cu 46A) sau altceva?
+Separația permite, mai târziu (Recruitment State), numărarea distinctă:
+câte invitații s-au făcut · câte au fost acceptate · câte au devenit
+întâlniri · câte întâlniri s-au finalizat · câte au produs o decizie.
 
-**D. `DECLINED` → ce urmează?** Metodologia cere cascada
-(produs → recomandare → black box), dar niciuna nu are reprezentare în
-cod azi. În v1, `DECLINED` doar se înregistrează, fără continuare
-automată?
+### A. `meetings.status` — valori standardizate
+
+```
+SCHEDULED · COMPLETED · CANCELLED · RESCHEDULED
+```
+
+**Regulă strictă**: `meetings.status` **nu reprezintă răspunsul la
+invitație**. Sunt două lucruri diferite, pe două niveluri:
+
+```
+INVITE outcome  →  ACCEPTED / POSTPONED / QUESTION / OBJECTION / DECLINED
+                          ↓ (doar ACCEPTED, și doar cu dată stabilită)
+MEETING status  →  SCHEDULED / COMPLETED / CANCELLED / RESCHEDULED
+```
+
+Necesită `CHECK` constraint adăugat pe `meetings.status` (azi lipsește
+— singura coloană de stare din schemă fără restricție).
+
+### B. `ACCEPTED` → Meeting: NU automat
+
+`ACCEPTED` înregistrează **acceptarea invitației**, atât. `Meeting` se
+creează **doar când există efectiv o dată/oră programată**:
+
+```
+ACCEPTED  →  "Da, vreau"  →  se stabilește ziua/ora  →  MEETING (SCHEDULED)
+```
+
+Rezolvă elegant problema `scheduled_at NOT NULL` și e mai aproape de
+realitate: omul poate spune *"da, sigur, hai să vorbim"*, iar
+programarea efectivă vine ulterior.
+
+### C. Mesajul — liderul scrie, sistemul dă structura
+
+Model identic cu 46A. **INVITE v1 nu e generator AI de texte.**
+
+Workbench-ul oferă: persoana · context · motivul invitației · tipul
+întâlnirii (cafea / Zoom / apel / live) · câmp liber pentru mesaj.
+
+Cele 3 tonuri (`CALDA`/`RELAXATA`/`DIRECTA`) rămân **opțiuni de
+ghidare și etichetare**, nu texte generate automat.
+
+### D. `DECLINED` — doar se înregistrează în v1
+
+Fără declanșare automată de: produs · recomandare · Black Box · altă
+cascadă.
+
+Motiv: metodologia spune că relația continuă **în funcție de context**;
+automatizarea acestor ramificații ar introduce comportament
+necontractat.
+
+```
+DECLINED  →  înregistrat  →  contactul rămâne în sistem
+```
+
+Ulterior, FollowUp / Recomandare / Reactivare (Decizia 46, deja
+construită) pot decide ce urmează — manual, la alegerea liderului.
+
+### Fluxul complet, înghețat
+
+```
+OUTREACH / CONVERSATION
+          ↓
+       INVITE
+          ↓
+ ┌────────┼──────────┬───────────┬──────────┐
+ ↓        ↓          ↓           ↓          ↓
+ACCEPTED POSTPONED QUESTION   OBJECTION  DECLINED
+ ↓        ↓          ↓           ↓          ↓
+Meeting  Follow-up Conversation Objection  înregistrare
+(după                                       (fără
+programare)                                 continuare automată)
+```
 
 ## 7. Explicit exclus din v1
 
@@ -142,12 +203,16 @@ automată?
 Concret: după 48, starea **AM INVITAȚII** devine 🟢 observabilă, iar
 lanțul de recrutare nu mai are gol la mijloc.
 
-## 9. Ordinea de lucru
+## 9. Status și ordinea de lucru
+
+**Toate cele 4 puncte deschise sunt înghețate (§6). Contractul e
+complet — RED poate începe.**
 
 ```
-acest contract + răspuns la punctele §6
+contract 48 ✅ COMPLET
         ↓
-schema (migrare 007)
+schema (migrare 007: invitations, invitation_outcomes,
+        meetings.status CHECK, meetings.source_invitation_id)
         ↓
 RED
         ↓
@@ -156,6 +221,6 @@ GREEN
 regresie completă (512 + N)
         ↓
 CI + verificare independentă
+        ↓
+48A — Workbench INVITE (decizie separată)
 ```
-
-Nu se scrie cod înainte de clarificarea celor 4 puncte deschise.
